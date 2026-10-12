@@ -1,0 +1,26 @@
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Coins, LockKeyhole, Palette, Send, ShieldCheck, Users, Wrench } from 'lucide-react'
+
+const stages = [
+  { number: '01', title: 'Client submits a request', description: 'A client sends an assignment brief, scope, urgency, and preferred contact channel.', icon: ClipboardList, tone: 'bg-indigo-50 text-indigo-700' },
+  { number: '02', title: 'Secure intake line', description: 'Every request enters one controlled, confidential intake channel for consistent handling.', icon: LockKeyhole, tone: 'bg-slate-100 text-slate-700' },
+  { number: '03', title: 'Intake contact logs it', description: 'The intake contact person confirms the brief and records the request for operations.', icon: ShieldCheck, tone: 'bg-emerald-50 text-emerald-700' },
+  { number: '04', title: 'Higher-ups are notified', description: 'Operations receives the new request and reviews the requirements, timing, and fit.', icon: Send, tone: 'bg-amber-50 text-amber-700' },
+  { number: '05', title: 'Work is allocated', description: 'The right specialist or project team is assigned based on the assignment type.', icon: Users, tone: 'bg-violet-50 text-violet-700' },
+  { number: '06', title: 'Work is completed', description: 'Assigned personnel execute the work with oversight where the project requires it.', icon: CheckCircle2, tone: 'bg-cyan-50 text-cyan-700' },
+  { number: '07', title: 'Delivery and payout', description: 'The finished work is delivered to the client, then contributors are paid for their completed work.', icon: Coins, tone: 'bg-rose-50 text-rose-700' },
+]
+
+const routing = [
+  { title: 'Reading & writing', owner: 'Seraphim and team', description: 'Research, essays, reports, literature reviews, editing, and structured writing.', icon: BookOpen },
+  { title: 'Hands-on work', owner: 'Caleb and team', description: 'Graphic design, IT support, software, systems, and other practical deliverables.', icon: Wrench },
+  { title: 'Project work', owner: 'Higher-ups oversee', description: 'Larger engagements are coordinated jointly and delivered by the relevant personnel.', icon: Palette },
+]
+
+export default function WorkflowPage() {
+  return <main className="min-h-screen bg-slate-50 text-slate-900">
+    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-indigo-600">Gemini Nexus operations</p><h1 className="mt-2 text-xl font-bold tracking-tight">Assignment workflow roadmap</h1></div><a href="/" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-600">Request assistance <ArrowRight className="size-4" /></a></div></header>
+    <section className="border-b border-slate-200 bg-white"><div className="mx-auto max-w-6xl px-5 py-14 lg:px-8"><div className="max-w-3xl"><span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700"><ShieldCheck className="size-3.5" /> One secure line from intake to delivery</span><h2 className="mt-5 text-4xl font-bold tracking-[-.05em] text-slate-950 sm:text-6xl">A clear path for every assignment.</h2><p className="mt-5 max-w-2xl text-base leading-7 text-slate-500">Every request is received, routed to the right people, completed with care, and delivered through a single accountable workflow.</p></div></div></section>
+    <section className="mx-auto max-w-6xl px-5 py-12 lg:px-8"><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{stages.map(({ number, title, description, icon: Icon, tone }) => <article key={number} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between"><span className={`flex size-11 items-center justify-center rounded-xl ${tone}`}><Icon className="size-5" /></span><span className="text-xs font-bold tracking-[.16em] text-slate-300">{number}</span></div><h3 className="mt-5 text-base font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{description}</p></article>)}</div></section>
+    <section className="mx-auto max-w-6xl px-5 pb-16 lg:px-8"><div className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white sm:p-8"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-indigo-300">Specialist routing</p><h2 className="mt-3 text-2xl font-bold tracking-tight">The right team for the right kind of work.</h2><p className="mt-3 text-sm leading-6 text-slate-300">Higher-ups allocate requests according to assignment type, capacity, and the specialist skills required.</p></div><div className="mt-8 grid gap-4 lg:grid-cols-3">{routing.map(({ title, owner, description, icon: Icon }) => <article key={title} className="rounded-2xl border border-white/10 bg-white/5 p-5"><Icon className="size-5 text-indigo-300" /><p className="mt-5 text-sm font-bold">{title}</p><p className="mt-1 text-xs font-semibold text-indigo-200">{owner}</p><p className="mt-3 text-sm leading-6 text-slate-300">{description}</p></article>)}</div></div></section>
+  </main>
+}
