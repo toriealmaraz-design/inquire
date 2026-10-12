@@ -84,7 +84,7 @@ export default function Page() {
   }
 
   useEffect(() => {
-    fetch('/api/admin/session').then((response) => response.json()).then((data) => { setAdminAuthenticated(Boolean(data.authenticated)); if (data.authenticated) fetch('/api/admin/accounts').then((response) => response.ok ? response.json() : []).then(setAccounts).catch(() => undefined) }).catch(() => setAdminAuthenticated(false))
+    fetch('/api/admin/session').then((response) => response.json()).then((data) => { setAdminAuthenticated(Boolean(data.authenticated)); if (data.authenticated) fetch('/api/admin/accounts').then(async (response) => { const payload = await response.json().catch(() => []); return response.ok && Array.isArray(payload) ? payload : [] }).then((payload) => setAccounts(payload)).catch(() => setAccounts([])) }).catch(() => setAdminAuthenticated(false))
     fetch('/api/settings').then((response) => response.json()).then((data) => setSettings((current) => ({ ...current, ...data }))).catch(() => undefined)
   }, [])
 
