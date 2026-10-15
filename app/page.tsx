@@ -80,6 +80,9 @@ export default function Page() {
   const dispatch = async (nextChannel: Channel) => {
     setChannel(nextChannel)
     await fetch('/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: track, serviceType: selectedTrack.title, scope: scopeText, urgency, clientContact: contact, briefDetails: brief, fileUrls: fileName ? `Attachment selected: ${fileName}` : '' }) }).catch(() => undefined)
+    if (nextChannel === 'whatsapp') {
+      window.open(socialLinks.find((link) => link.label === 'WhatsApp')?.href, '_blank', 'noopener,noreferrer')
+    }
     setSent(true)
     setTickets((items) => [...items, { id: `#GN-${1045 + items.length}`, track, title: selectedTrack.title, scope: scopeText, urgency, status: 'Pending Quote', assignee: 'Unassigned' }])
   }
