@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Ghana City Scouts | Work Support',
-  description: 'Ghana City Scouts helps with school work, designs, and computer projects.',
+  title: 'Inquire | Work Support',
+  description: 'Inquire helps with school work, designs, and computer projects.',
   generator: 'v0.app',
   icons: {
     icon: [
