@@ -74,6 +74,18 @@ export const submissions = pgTable('submissions', {
   createdAt: timestamp('created_at').defaultNow(),
 })
 
+export const staffAccounts = pgTable('staff_accounts', {
+  id: serial('id').primaryKey(),
+  fullName: varchar('full_name', { length: 120 }).notNull(),
+  email: varchar('email', { length: 160 }).notNull().unique(),
+  role: varchar('role', { length: 60 }).notNull(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  mustChangePassword: boolean('must_change_password').notNull().default(true),
+  active: boolean('active').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+})
+
 export type User = typeof users.$inferSelect
 export type NewUser = typeof users.$inferInsert
 export type Conversation = typeof conversations.$inferSelect

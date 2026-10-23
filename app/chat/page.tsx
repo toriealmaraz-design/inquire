@@ -51,7 +51,7 @@ function renderContent(text: string) {
 }
 
 export default function ChatPage() {
-  const supabase = createClient()
+  const supabase = process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? createClient() : null
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [agentOnline] = useState(true)
@@ -82,7 +82,7 @@ export default function ChatPage() {
 
   // Load existing messages + subscribe to realtime for this conversation
   useEffect(() => {
-    if (!convoId) return
+    if (!supabase || !convoId) return
     let active = true
 
     ;(async () => {
@@ -117,6 +117,7 @@ export default function ChatPage() {
   }, [messages])
 
   const ensureConversation = useCallback(async (): Promise<number | null> => {
+    if (!supabase) return null
     if (convoId) return convoId
     const { data, error } = await supabase
       .from('conversations')
@@ -131,6 +132,7 @@ export default function ChatPage() {
   }, [convoId, clientName, supabase])
 
   const send = async () => {
+    if (!supabase) return
     const text = input.trim()
     if (!text || sending) return
     setSending(true)
@@ -155,6 +157,7 @@ export default function ChatPage() {
   }
 
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!supabase) return
     const file = e.target.files?.[0]
     if (e.target) e.target.value = ''
     if (!file || uploading) return
