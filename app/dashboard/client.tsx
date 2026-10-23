@@ -1,0 +1,723 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
+import {
+  BarChart3,
+  Check,
+  Clock3,
+  LogOut,
+  MessageCircle,
+  Settings2,
+  Users,
+  Zap,
+  UserCheck,
+  UserX,
+  Phone,
+  Send,
+  Camera,
+  Save,
+  ShieldCheck,
+  FileText,
+  Bell,
+  Download,
+} from 'lucide-react'
+
+type User = {
+  id?: string
+  name?: string | null
+  email?: string | null
+  image?: string | null
+  role?: string | null
+  status?: string
+}
+
+type DBUser = {
+  id: number
+  email: string
+  name: string
+  avatar: string | null
+  role: string | null
+  status: string
+  createdAt: string
+}
+
+type Settings = {
+  whatsapp: string
+  telegram: string
+  instagram: string
+  snapchat: string
+}
+
+type Convo = {
+  id: number
+  clientName: string
+  lastMessage: string
+  unread: number
+  time: string
+}
+
+type UploadRow = {
+  id: number
+  conversation_id: number | null
+  file_name: string
+  file_url: string
+  file_type: string | null
+  file_size: number | null
+  uploaded_by: string
+  created_at: string
+}
+
+type DbMsg = {
+  id: number
+  conversation_id: number
+  sender_type: string
+  content: string
+  read: boolean | null
+  created_at: string
+}
+
+function fmtTime(iso: string) {
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+function fmtSize(bytes: number | null) {
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
+const ROLES = [
+  { value: 'super_admin', label: 'Super Admin' },
+  { value: 'academic_lead', label: 'Academic Lead' },
+  { value: 'it_graphics_lead', label: 'IT/Graphics Lead' },
+  { value: 'field_specialist', label: 'Field Specialist' },
+  { value: 'agent', label: 'Agent (Chat Only)' },
+]
+
+export function DashboardClient({ user }: { user: User }) {
+  const [tab, setTab] = useState('Overview')
+  const [users, setUsers] = useState<DBUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState<Settings>({
+    whatsapp: '',
+    telegram: '',
+    instagram: '',
+    snapchat: '',
+  })
+  const [settingsLoading, setSettingsLoading] = useState(false)
+  const [settingsSaved, setSettingsSaved] = useState(false)
+  const [conversations, setConversations] = useState<Convo[]>([])
+  const [uploads, setUploads] = useState<UploadRow[]>([])
+  const [unread, setUnread] = useState(0)
+  const [notifEnabled, setNotifEnabled] = useState(false)
+  const [supabase] = useState(() => createClient())
+  const router = useRouter()
+
+  // Load live chat + upload data from Supabase
+  const loadChatData = useCallback(async () => {
+    const { data: convos } = await supabase
+      .from('conversations')
+      .select('id, client_name, status, updated_at')
+      .order('updated_at', { ascending: false })
+    const { data: msgs } = await supabase
+      .from('messages')
+      .select('id, conversation_id, sender_type, content, read, created_at')
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    const byConvo = new Map<number, DbMsg[]>()
+    ;(msgs as DbMsg[] | null)?.forEach((m) => {
+      const arr = byConvo.get(m.conversation_id) || []
+      arr.push(m)
+      byConvo.set(m.conversation_id, arr)
+    })
+    let totalUnread = 0
+    const list: Convo[] = (convos || []).map((c: any) => {
+      const cm = byConvo.get(c.id) || []
+      const last = cm[0]
+      const u = cm.filter((m) => m.sender_type === 'client' && !m.read).length
+      totalUnread += u
+      return {
+        id: c.id,
+        clientName: c.client_name,
+        lastMessage: last ? last.content : 'No messages yet',
+        unread: u,
+        time: last ? fmtTime(last.created_at) : fmtTime(c.updated_at),
+      }
+    })
+    setConversations(list)
+    setUnread(totalUnread)
+    const { data: ups } = await supabase
+      .from('uploads')
+      .select('*')
+      .order('created_at', { ascending: false })
+    setUploads((ups as UploadRow[]) || [])
+  }, [supabase])
+
+  const requestNotif = useCallback(async () => {
+    if (typeof Notification === 'undefined') return
+    if (Notification.permission === 'granted') {
+      setNotifEnabled(true)
+      return
+    }
+    const perm = await Notification.requestPermission()
+    setNotifEnabled(perm === 'granted')
+  }, [])
+
+  useEffect(() => {
+    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifEnabled(true)
+    loadChatData()
+    const channel = supabase
+      .channel('dashboard-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => loadChatData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, () => loadChatData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        loadChatData()
+        const r = payload.new as DbMsg
+        if (r.sender_type === 'client' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+          new Notification('New client message', { body: r.content.slice(0, 120) })
+        }
+      })
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [supabase, loadChatData])
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/')
+    router.refresh()
+  }
+
+  const isSuperAdmin = user.role === 'super_admin'
+  const isSubAdmin = ['academic_lead', 'it_graphics_lead', 'field_specialist'].includes(user.role || '')
+  
+  // Navigation based on role
+  const nav = isSuperAdmin
+    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Settings']
+    : isSubAdmin
+    ? ['Overview', 'Submissions', 'Chats']
+    : ['Overview', 'Chats']
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        // Fetch users if super admin
+        if (isSuperAdmin) {
+          const usersRes = await fetch('/api/admin/users')
+          const usersData = await usersRes.json()
+          setUsers(Array.isArray(usersData) ? usersData : [])
+        }
+        
+        // Fetch settings
+        const settingsRes = await fetch('/api/settings')
+        const settingsData = await settingsRes.json()
+        setSettings({
+          whatsapp: settingsData.whatsapp || '',
+          telegram: settingsData.telegram || '',
+          instagram: settingsData.instagram || '',
+          snapchat: settingsData.snapchat || '',
+        })
+      } catch (error) {
+        console.error('Error fetching data:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchData()
+  }, [isSuperAdmin])
+
+  const updateUser = async (id: number, updates: Partial<DBUser>) => {
+    const res = await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, ...updates }),
+    })
+    if (res.ok) {
+      const updated = await res.json()
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updated } : u))
+    }
+  }
+
+  const saveSettings = async () => {
+    setSettingsLoading(true)
+    setSettingsSaved(false)
+    try {
+      await fetch('/api/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(settings),
+      })
+      setSettingsSaved(true)
+      setTimeout(() => setSettingsSaved(false), 3000)
+    } catch (error) {
+      console.error('Error saving settings:', error)
+    } finally {
+      setSettingsLoading(false)
+    }
+  }
+
+  const pendingCount = users.filter(u => u.status === 'pending').length
+  const activeCount = users.filter(u => u.status === 'active').length
+
+  return (
+    <main className="min-h-screen bg-[#06121d] text-slate-100">
+      <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
+        <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
+        <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
+      </div>
+
+      <div className="mx-auto flex max-w-7xl gap-6 px-5 py-8 lg:px-8">
+        {/* Sidebar */}
+        <aside className={`${glass} hidden w-60 shrink-0 rounded-3xl p-4 lg:block`}>
+          <div className="mb-8 flex items-center gap-3 px-3">
+            {user.image ? (
+              <img src={user.image} alt="" className="size-10 rounded-full" />
+            ) : (
+              <div className="size-10 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-bold">
+                {user.name?.[0] || 'U'}
+              </div>
+            )}
+            <div className="min-w-0">
+              <p className="text-sm font-bold truncate">{user.name}</p>
+              <p className="text-[10px] text-cyan-300 uppercase tracking-wider">
+                {user.role?.replace(/_/g, ' ')}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            {nav.map(item => (
+              <button
+                key={item}
+                onClick={() => setTab(item)}
+                className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm ${
+                  tab === item
+                    ? 'bg-cyan-300/15 text-cyan-200'
+                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                }`}
+              >
+                {item === 'Overview' && <BarChart3 className="size-4" />}
+                {item === 'User Management' && <Users className="size-4" />}
+                {item === 'Submissions' && <FileText className="size-4" />}
+                {item === 'Chats' && <MessageCircle className="size-4" />}
+                {item === 'Settings' && <Settings2 className="size-4" />}
+                {item}
+                {item === 'User Management' && pendingCount > 0 && (
+                  <span className="ml-auto rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">
+                    {pendingCount}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-8 pt-4 border-t border-white/10">
+            <div className="px-3 mb-3">
+              <p className="text-[10px] text-slate-500 uppercase tracking-wider">Quick Actions</p>
+            </div>
+            <a
+              href="/agent/chat"
+              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+            >
+              <MessageCircle className="size-4" /> Chat Console
+            </a>
+            <a
+              href="/"
+              className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm text-slate-400 hover:bg-white/5 hover:text-white"
+            >
+              <Zap className="size-4" /> View Site
+            </a>
+          </div>
+
+          <button
+            onClick={handleSignOut}
+            className="mt-6 flex items-center gap-2 px-3 text-xs text-slate-500 hover:text-white"
+          >
+            <LogOut className="size-3" /> Sign out
+          </button>
+        </aside>
+
+        {/* Main content */}
+        <div className="min-w-0 flex-1">
+          {/* Mobile header */}
+          <div className="lg:hidden mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {user.image ? (
+                <img src={user.image} alt="" className="size-8 rounded-full" />
+              ) : (
+                <div className="size-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center text-white font-bold text-sm">
+                  {user.name?.[0] || 'U'}
+                </div>
+              )}
+              <span className="text-sm font-bold">{user.name}</span>
+            </div>
+            <button onClick={handleSignOut} className="text-slate-400 hover:text-white">
+              <LogOut className="size-5" />
+            </button>
+          </div>
+
+          {/* Mobile nav */}
+          <div className="lg:hidden mb-6 flex gap-2 overflow-x-auto pb-2">
+            {nav.map(item => (
+              <button
+                key={item}
+                onClick={() => setTab(item)}
+                className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium ${
+                  tab === item
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-white/5 text-slate-400'
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">
+                {isSuperAdmin ? 'Super Admin' : isSubAdmin ? 'Admin' : 'Dashboard'}
+              </p>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">{tab}</h1>
+            </div>
+            <button
+              onClick={() => { requestNotif(); setTab('Chats') }}
+              title={notifEnabled ? 'Notifications on — click to view chats' : 'Enable notifications'}
+              className={`relative flex size-11 items-center justify-center rounded-2xl ${glass} ${notifEnabled ? 'text-cyan-300' : 'text-slate-400'} hover:text-white`}
+            >
+              <Bell className="size-5" />
+              {unread > 0 && (
+                <span className="absolute -right-1 -top-1 flex min-w-5 h-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
+                  {unread}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Overview Tab */}
+          {tab === 'Overview' && (
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+              {[
+                ['Active Users', activeCount, Users, 'text-emerald-400'],
+                ['Pending Approval', pendingCount, Clock3, 'text-amber-400'],
+                ['Active Chats', conversations.length, MessageCircle, 'text-blue-400'],
+                ['Submissions', uploads.length, Zap, 'text-violet-400'],
+              ].map(([label, value, Icon, color]: any) => (
+                <div key={label} className={`${glass} rounded-2xl p-5`}>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-500">{label}</span>
+                    <Icon className={`size-4 ${color}`} />
+                  </div>
+                  <p className="mt-4 text-2xl font-bold">{value}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* User Management Tab (Super Admin only) */}
+          {tab === 'User Management' && isSuperAdmin && (
+            <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="font-bold">All Users</h2>
+                  <p className="mt-1 text-xs text-slate-500">Approve pending users and assign roles.</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs">
+                    {activeCount} active
+                  </span>
+                  {pendingCount > 0 && (
+                    <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs">
+                      {pendingCount} pending
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="size-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
+                </div>
+              ) : users.length === 0 ? (
+                <p className="text-center py-12 text-slate-500">No users yet</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[700px] text-left text-sm">
+                    <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-500">
+                      <tr>
+                        <th className="pb-3">User</th>
+                        <th className="pb-3">Email</th>
+                        <th className="pb-3">Role</th>
+                        <th className="pb-3">Status</th>
+                        <th className="pb-3">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map(u => (
+                        <tr key={u.id} className="border-b border-white/5">
+                          <td className="py-4">
+                            <div className="flex items-center gap-3">
+                              {u.avatar ? (
+                                <img src={u.avatar} alt="" className="size-8 rounded-full" />
+                              ) : (
+                                <div className="size-8 rounded-full bg-slate-600 flex items-center justify-center text-xs">
+                                  {u.name[0]}
+                                </div>
+                              )}
+                              <span className="font-medium">{u.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-4 text-slate-400">{u.email}</td>
+                          <td className="py-4">
+                            <select
+                              value={u.role || ''}
+                              onChange={e => updateUser(u.id, { role: e.target.value || null } as any)}
+                              className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-xs text-white"
+                            >
+                              <option value="" className="bg-slate-900">Unassigned</option>
+                              {ROLES.map(r => (
+                                <option key={r.value} value={r.value} className="bg-slate-900">
+                                  {r.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-4">
+                            <span className={`rounded-full px-2 py-1 text-[11px] ${
+                              u.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' :
+                              u.status === 'pending' ? 'bg-amber-500/20 text-amber-300' :
+                              'bg-rose-500/20 text-rose-300'
+                            }`}>
+                              {u.status}
+                            </span>
+                          </td>
+                          <td className="py-4">
+                            <div className="flex gap-2">
+                              {u.status === 'pending' && (
+                                <button
+                                  onClick={() => updateUser(u.id, { status: 'active' })}
+                                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
+                                >
+                                  <UserCheck className="size-3" /> Approve
+                                </button>
+                              )}
+                              {u.status === 'active' && u.role !== 'super_admin' && (
+                                <button
+                                  onClick={() => updateUser(u.id, { status: 'disabled' })}
+                                  className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/30"
+                                >
+                                  <UserX className="size-3" /> Disable
+                                </button>
+                              )}
+                              {u.status === 'disabled' && (
+                                <button
+                                  onClick={() => updateUser(u.id, { status: 'active' })}
+                                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
+                                >
+                                  <Check className="size-3" /> Enable
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Submissions Tab */}
+          {tab === 'Submissions' && (
+            <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
+              <h2 className="font-bold">Submissions &amp; Files</h2>
+              <p className="mt-1 text-xs text-slate-500">Files clients and agents uploaded in chat. Download before they expire.</p>
+              {uploads.length === 0 ? (
+                <div className="mt-6 text-center py-12 text-slate-500">
+                  <FileText className="size-12 mx-auto mb-4 opacity-50" />
+                  <p>No submissions yet</p>
+                </div>
+              ) : (
+                <div className="mt-6 flex flex-col gap-3">
+                  {uploads.map((f) => (
+                    <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300">
+                        <FileText className="size-5" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium text-white">{f.file_name}</p>
+                        <p className="text-[11px] text-slate-500">
+                          {f.uploaded_by === 'client' ? 'Client' : 'Agent'} · Convo #{f.conversation_id ?? '—'} · {fmtSize(f.file_size)} · {fmtTime(f.created_at)}
+                        </p>
+                      </div>
+                      <a
+                        href={f.file_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        download
+                        className="flex shrink-0 items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500"
+                      >
+                        <Download className="size-4" /> Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Chats Tab */}
+          {tab === 'Chats' && (
+            <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="font-bold">Live Chats</h2>
+                  <p className="mt-1 text-xs text-slate-500">{conversations.length} conversation{conversations.length === 1 ? '' : 's'} · {unread} unread</p>
+                </div>
+                <a
+                  href="/agent/chat"
+                  className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-4 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500"
+                >
+                  <MessageCircle className="size-4" /> Open Chat Console
+                </a>
+              </div>
+              {conversations.length === 0 ? (
+                <div className="mt-6 text-center py-12 text-slate-500">
+                  <MessageCircle className="size-12 mx-auto mb-4 opacity-50" />
+                  <p>No conversations yet</p>
+                </div>
+              ) : (
+                <div className="mt-6 flex flex-col gap-2">
+                  {conversations.map((c) => (
+                    <a
+                      key={c.id}
+                      href="/agent/chat"
+                      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3 hover:bg-white/10"
+                    >
+                      <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-slate-600 text-sm font-bold text-white">C</div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-white">{c.clientName}</span>
+                          <span className="text-[10px] text-slate-500">{c.time}</span>
+                        </div>
+                        <p className="truncate text-xs text-slate-400">{c.lastMessage}</p>
+                      </div>
+                      {c.unread > 0 && (
+                        <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
+                          {c.unread}
+                        </span>
+                      )}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Settings Tab (Super Admin only) */}
+          {tab === 'Settings' && isSuperAdmin && (
+            <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_300px]">
+              {/* Connectors */}
+              <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="font-bold">Connectors</h2>
+                    <p className="mt-1 text-xs text-slate-500">Configure social media & messaging channels.</p>
+                  </div>
+                  {settingsSaved && (
+                    <span className="flex items-center gap-1 text-xs text-emerald-400">
+                      <Check className="size-4" /> Saved
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                      <Phone className="size-4" /> WhatsApp Number
+                    </label>
+                    <input
+                      value={settings.whatsapp}
+                      onChange={e => setSettings({ ...settings, whatsapp: e.target.value })}
+                      placeholder="233206478727"
+                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                      <Send className="size-4" /> Telegram Handle
+                    </label>
+                    <input
+                      value={settings.telegram}
+                      onChange={e => setSettings({ ...settings, telegram: e.target.value })}
+                      placeholder="@GeminiNexusAdmin"
+                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                      <Camera className="size-4" /> Instagram Handle
+                    </label>
+                    <input
+                      value={settings.instagram}
+                      onChange={e => setSettings({ ...settings, instagram: e.target.value })}
+                      placeholder="@GeminiNexusAdmin"
+                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                      <Zap className="size-4" /> Snapchat Username
+                    </label>
+                    <input
+                      value={settings.snapchat}
+                      onChange={e => setSettings({ ...settings, snapchat: e.target.value })}
+                      placeholder="GeminiNexus"
+                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  onClick={saveSettings}
+                  disabled={settingsLoading}
+                  className="mt-6 flex items-center gap-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-3 text-sm font-bold text-white hover:from-cyan-400 hover:to-blue-500 disabled:opacity-50"
+                >
+                  {settingsLoading ? (
+                    <div className="size-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Save className="size-4" />
+                  )}
+                  Save Changes
+                </button>
+              </div>
+
+              {/* Info Card */}
+              <div className={`${glass} rounded-3xl p-5 h-fit`}>
+                <ShieldCheck className="size-6 text-emerald-400" />
+                <h3 className="mt-4 font-bold">Security</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-500">
+                  All connectors are encrypted at rest. Only super admins can modify these settings.
+                </p>
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <p className="text-xs text-slate-500">Last updated</p>
+                  <p className="text-sm text-white mt-1">Just now</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </main>
+  )
+}

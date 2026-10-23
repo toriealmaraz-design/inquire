@@ -3,8 +3,8 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Inquire | Work Support',
-  description: 'Inquire helps with school work, designs, and computer projects.',
+  title: 'Gemini Nexus | Academic & Technical Solutions',
+  description: 'Precision academic reports, software development, web systems, and technical research solutions.',
   generator: 'v0.app',
   icons: {
     icon: [
