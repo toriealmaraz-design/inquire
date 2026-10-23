@@ -3,3 +3,9 @@ pmOnFail: ignore
 minimumReleaseAgeExclude:
   - '@next/*'
   - next
+
+onlyBuiltDependencies:
+  - esbuild
+  - workerd
+  - "@cloudflare/workerd-linux-64"
+  - sharp
