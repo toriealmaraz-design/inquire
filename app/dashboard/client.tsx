@@ -9,7 +9,7 @@ import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { ChatbotSettings } from '@/components/chatbot-settings'
 import { RoleWatcher } from '@/components/role-watcher'
-import { FIELDS } from '@/lib/fields'
+import { FIELDS, briefTitle } from '@/lib/fields'
 import {
   BarChart3,
   Check,
@@ -26,6 +26,7 @@ import {
   FileText,
   Bell,
   Download,
+  Pencil,
   ChevronDown,
   Megaphone,
   Trophy,
@@ -77,6 +78,7 @@ type IntakeRow = {
   ticketId: string
   category: string
   serviceType: string
+  title: string | null
   scope: string | null
   urgency: string | null
   clientContact: string | null
@@ -372,7 +374,7 @@ export function DashboardClient({ user }: { user: User }) {
     .filter((f) => {
       const q = subSearch.trim().toLowerCase()
       if (!q) return true
-      return [f.name, f.contact, ...f.briefs.map((s) => `${s.ticketId} ${s.serviceType} ${s.briefDetails || ''}`), ...f.files.map((x) => x.file_name)]
+      return [f.name, f.contact, ...f.briefs.map((s) => `${s.ticketId} ${briefTitle(s)} ${s.serviceType} ${s.briefDetails || ''}`), ...f.files.map((x) => x.file_name)]
         .join(' ')
         .toLowerCase()
         .includes(q)
@@ -755,9 +757,22 @@ export function DashboardClient({ user }: { user: User }) {
                               {g.briefs.map((s) => (
                     <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs text-cyan-200">{s.ticketId}</span>
-                          <span className="text-sm font-medium text-white">{s.serviceType}</span>
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                            <span className="truncate">{briefTitle(s)}</span>
+                            <button
+                              onClick={() => {
+                                const t = window.prompt('Brief title', s.title || briefTitle(s))
+                                if (t && t.trim()) updateBrief(s.id, { action: 'rename', title: t })
+                              }}
+                              aria-label={`Rename ${s.ticketId}`}
+                              title="Rename"
+                              className="shrink-0 rounded p-0.5 text-slate-500 hover:text-cyan-300"
+                            >
+                              <Pencil className="size-3" />
+                            </button>
+                          </p>
+                          <p className="mt-0.5 text-[11px] text-slate-500"><span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}</p>
                         </div>
                         <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
                       </div>

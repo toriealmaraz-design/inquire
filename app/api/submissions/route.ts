@@ -4,7 +4,7 @@ import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
 import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin, isLead } from '@/lib/auth'
-import { fieldLabel } from '@/lib/fields'
+import { briefTitle, fieldLabel } from '@/lib/fields'
 import { sendPush } from '@/lib/push'
 
 export const runtime = 'nodejs'
@@ -29,6 +29,7 @@ export async function GET() {
         ticketId: submissions.ticketId,
         category: submissions.category,
         serviceType: submissions.serviceType,
+        title: submissions.title,
         scope: submissions.scope,
         urgency: submissions.urgency,
         clientContact: submissions.clientContact,
@@ -94,6 +95,7 @@ export async function POST(request: Request) {
             ticketId,
             category,
             serviceType,
+            title: briefTitle({ title: clean(body.title, 120), briefDetails: clean(body.briefDetails, 1600), serviceType }),
             scope: clean(body.scope, 50),
             urgency: clean(body.urgency, 50),
             clientContact: clean(body.clientContact, 50),
@@ -117,7 +119,7 @@ export async function POST(request: Request) {
       await Promise.all([
         sendPush(
           { userIds: admins.map((a) => a.id) },
-          { title: `New brief ${created.ticketId}`, body: `${fieldLabel(category)} · ${clean(body.scope, 50)} · ${clean(body.urgency, 50)}`, url: '/dashboard', tag: `brief-${created.id}` }
+          { title: `New brief: ${briefTitle({ title: clean(body.title, 120), briefDetails: clean(body.briefDetails, 1600), serviceType })}`, body: `${created.ticketId} · ${fieldLabel(category)} · ${clean(body.scope, 50)} · ${clean(body.urgency, 50)}`, url: '/dashboard', tag: `brief-${created.id}` }
         ),
         referredBy
           ? sendPush({ userIds: [referredBy] }, { title: 'A client used your link', body: `Brief ${created.ticketId} was submitted. You earn commission when it's paid.`, url: '/agent/dashboard' })
@@ -151,6 +153,13 @@ export async function PATCH(request: Request) {
   try {
     const [existing] = await db.select().from(submissions).where(eq(submissions.id, id)).limit(1)
     if (!existing) return NextResponse.json({ error: 'Brief not found.' }, { status: 404 })
+    if (body?.action === 'rename') {
+      const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 120) : ''
+      if (!title) return NextResponse.json({ error: 'Enter a title.' }, { status: 400 })
+      const [updated] = await db.update(submissions).set({ title }).where(eq(submissions.id, id)).returning()
+      return NextResponse.json(updated)
+    }
+
     if (existing.paidAt) return NextResponse.json({ error: 'This job is already paid and locked.' }, { status: 409 })
 
     if (body?.action === 'assign') {
@@ -185,7 +194,7 @@ export async function PATCH(request: Request) {
 
       sendPush(
         { userIds: [agent.id] },
-        { title: `New assignment ${existing.ticketId}`, body: `${existing.serviceType} · price GHS ${price.toFixed(2)} · your commission GHS ${commission.toFixed(2)}`, url: '/agent/dashboard' }
+        { title: `New assignment: ${briefTitle(existing)}`, body: `${existing.ticketId} · price GHS ${price.toFixed(2)} · your commission GHS ${commission.toFixed(2)}`, url: '/agent/dashboard' }
       ).catch((e) => console.error('Assign push failed:', e))
 
       return NextResponse.json({ ...updated, assigneeName: agent.name })

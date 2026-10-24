@@ -3,6 +3,7 @@ import { desc, eq, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { settings, submissions } from '@/lib/db/schema'
 import { ensureReferralCode, getStaffUser } from '@/lib/auth'
+import { briefTitle } from '@/lib/fields'
 
 export const runtime = 'nodejs'
 
@@ -21,6 +22,7 @@ export async function GET() {
           ticketId: submissions.ticketId,
           category: submissions.category,
           serviceType: submissions.serviceType,
+          title: submissions.title,
           scope: submissions.scope,
           urgency: submissions.urgency,
           briefDetails: submissions.briefDetails,
@@ -51,6 +53,7 @@ export async function GET() {
         ticketId: r.ticketId,
         category: r.category,
         serviceType: r.serviceType,
+        title: briefTitle(r),
         // Brief details only for work actually assigned to this person
         scope: assignedToMe ? r.scope : null,
         urgency: assignedToMe ? r.urgency : null,

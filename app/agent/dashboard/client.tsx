@@ -32,6 +32,7 @@ type Earnings = {
     ticketId: string
     category: string
     serviceType: string
+    title: string
     scope: string | null
     urgency: string | null
     briefDetails: string | null
@@ -250,7 +251,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
               {earnings.items.map((item) => (
                 <li key={item.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="min-w-0"><span className="font-mono text-xs text-cyan-200">{item.ticketId}</span> <span className="text-sm font-medium text-white">{item.serviceType}</span></span>
+                    <span className="min-w-0"><span className="block truncate text-sm font-semibold text-white">{item.title}</span><span className="text-[11px] text-slate-500"><span className="font-mono text-cyan-300/80">{item.ticketId}</span> · {item.serviceType}</span></span>
                     <span className={`rounded-full px-2 py-0.5 text-[11px] ${item.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{item.paidAt ? 'Paid' : item.status || 'Pending'}</span>
                   </div>
                   <p className="mt-1 text-[11px] text-slate-500">

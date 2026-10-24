@@ -72,6 +72,7 @@ export const submissions = pgTable('submissions', {
   ticketId: varchar('ticket_id', { length: 20 }).notNull().unique(),
   category: varchar('category', { length: 50 }).notNull(),
   serviceType: varchar('service_type', { length: 100 }).notNull(),
+  title: varchar('title', { length: 120 }),
   scope: varchar('scope', { length: 50 }),
   urgency: varchar('urgency', { length: 50 }),
   clientContact: varchar('client_contact', { length: 50 }),

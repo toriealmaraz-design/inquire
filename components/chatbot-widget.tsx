@@ -79,7 +79,7 @@ export function ChatbotWidget() {
       try {
         const res = await fetch(`/api/ticket?id=${encodeURIComponent(ticket[0])}`)
         const d = await res.json()
-        if (d.found) return { from: 'bot', text: `Brief ${d.ticketId} (${d.serviceType}) is currently: ${d.status}. For details, our team can update you in Live Chat.`, handoff: `Hi, I'd like an update on my brief ${d.ticketId}.` }
+        if (d.found) return { from: 'bot', text: `“${d.title}” (${d.ticketId}) is currently: ${d.status}. For details, our team can update you in Live Chat.`, handoff: `Hi, I'd like an update on my brief ${d.ticketId}.` }
         return { from: 'bot', text: `I couldn't find ${ticket[0]}. Please check the number. Our team can help in Live Chat.`, handoff: `Hi, I can't find my brief ${ticket[0]}.` }
       } catch {
         return { from: 'bot', text: "I couldn't check that ticket right now. Please ask our team in Live Chat.", handoff: `Hi, can you check my brief ${ticket[0]}?` }
