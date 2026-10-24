@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { Announcements } from '@/components/announcements'
+import { Leaderboard } from '@/components/leaderboard'
 
 type User = {
   id?: string
@@ -263,6 +264,8 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </ul>
           )}
         </div>
+
+        <div className="mt-6"><Leaderboard compact /></div>
 
         <div className="mt-6"><Announcements role={user.role} field={user.field} limit={5} /></div>
 

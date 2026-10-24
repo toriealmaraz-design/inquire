@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
 import { SupportPresence } from '@/components/support-presence'
 import { Announcements } from '@/components/announcements'
+import { Leaderboard } from '@/components/leaderboard'
 import { FIELDS } from '@/lib/fields'
 import {
   BarChart3,
@@ -27,6 +28,7 @@ import {
   Bell,
   Download,
   Megaphone,
+  Trophy,
   Percent,
 } from 'lucide-react'
 
@@ -243,9 +245,9 @@ export function DashboardClient({ user }: { user: User }) {
   
   // Navigation based on role
   const nav = isSuperAdmin
-    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Announcements', 'Settings']
+    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Leaderboard', 'Announcements', 'Settings']
     : isSubAdmin
-    ? ['Overview', 'Submissions', 'Chats', 'Announcements']
+    ? ['Overview', 'Submissions', 'Chats', 'Leaderboard', 'Announcements']
     : ['Overview', 'Chats']
 
   useEffect(() => {
@@ -401,6 +403,7 @@ export function DashboardClient({ user }: { user: User }) {
                 {item === 'Chats' && <MessageCircle className="size-4" />}
                 {item === 'Settings' && <Settings2 className="size-4" />}
                 {item === 'Announcements' && <Megaphone className="size-4" />}
+                {item === 'Leaderboard' && <Trophy className="size-4" />}
                 {item}
                 {item === 'User Management' && pendingCount > 0 && (
                   <span className="ml-auto rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">
@@ -844,6 +847,8 @@ export function DashboardClient({ user }: { user: User }) {
               )}
             </div>
           )}
+
+          {tab === 'Leaderboard' && <div className="mt-8"><Leaderboard /></div>}
 
           {/* Announcements Tab */}
           {tab === 'Announcements' && (
