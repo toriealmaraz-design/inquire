@@ -3,6 +3,7 @@ import { eq, asc } from 'drizzle-orm'
 import { requireSuperAdmin } from '@/lib/auth'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
+import { isField } from '@/lib/fields'
 
 export const runtime = 'nodejs'
 
@@ -19,6 +20,7 @@ export async function GET() {
       avatar: users.avatar,
       role: users.role,
       status: users.status,
+      field: users.field,
       createdAt: users.createdAt,
     })
     .from(users)
@@ -52,6 +54,12 @@ export async function PATCH(request: Request) {
     }
   }
 
+  if (body?.field !== undefined) {
+    if (body.field === null || body.field === '') updates.field = null
+    else if (isField(body.field)) updates.field = body.field
+    else return NextResponse.json({ error: 'Unknown field.' }, { status: 400 })
+  }
+
   const [updated] = await db
     .update(users)
     .set(updates)
@@ -60,6 +68,7 @@ export async function PATCH(request: Request) {
       id: users.id,
       role: users.role,
       status: users.status,
+      field: users.field,
     })
 
   return updated

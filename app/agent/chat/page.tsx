@@ -1,9 +1,12 @@
 import { redirect } from 'next/navigation'
-import { getUser, canChat } from '@/lib/auth'
+import { getPageUser, canChat } from '@/lib/auth'
 import { AgentChatClient } from './client'
 
+// Signed-in pages read cookies; never prerender them.
+export const dynamic = 'force-dynamic'
+
 export default async function AgentChatPage() {
-  const user = await getUser()
+  const user = await getPageUser()
 
   if (!user) {
     redirect('/auth/signin')
@@ -25,5 +28,6 @@ export default async function AgentChatPage() {
     email: user.email,
     image: user.avatar,
     role: user.role,
+    field: user.field,
   }} />
 }

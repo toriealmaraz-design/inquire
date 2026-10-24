@@ -1,10 +1,13 @@
 import { redirect } from 'next/navigation'
-import { getUser, isAdmin } from '@/lib/auth'
+import { getPageUser, isAdmin } from '@/lib/auth'
 import { DashboardClient } from './client'
 import { SignOutButton } from './signout-button'
 
+// Signed-in pages read cookies; never prerender them.
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
-  const user = await getUser()
+  const user = await getPageUser()
 
   if (!user) {
     redirect('/auth/signin')
@@ -70,5 +73,6 @@ export default async function DashboardPage() {
     image: user.avatar,
     role: user.role,
     status: user.status,
+    field: user.field,
   }} />
 }

@@ -1,4 +1,4 @@
-import { boolean, integer, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core'
+import { boolean, integer, numeric, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core'
 
 // Users (supports Google OAuth and Email auth)
 export const users = pgTable('users', {
@@ -9,6 +9,8 @@ export const users = pgTable('users', {
   avatar: text('avatar'),
   role: varchar('role', { length: 50 }), // 'super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist', 'agent'
   status: varchar('status', { length: 20 }).notNull().default('active'),
+  field: varchar('field', { length: 30 }), // 'academic' | 'media' | 'systems'
+  referralCode: varchar('referral_code', { length: 20 }).unique(),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })
@@ -21,6 +23,9 @@ export const settings = pgTable('settings', {
   snapchatUsername: varchar('snapchat_username', { length: 50 }).default('GeminiNexus'),
   telegramBotToken: text('telegram_bot_token').default(''),
   telegramChatId: varchar('telegram_chat_id', { length: 50 }).default(''),
+  commissionPercent: numeric('commission_percent', { precision: 5, scale: 2 }).default('10'),
+  vapidPublicKey: text('vapid_public_key'),
+  vapidPrivateKey: text('vapid_private_key'),
   updatedAt: timestamp('updated_at').defaultNow(),
 })
 
@@ -71,7 +76,31 @@ export const submissions = pgTable('submissions', {
   fileUrls: text('file_urls'),
   status: varchar('status', { length: 30 }).default('Pending Quote'),
   assignedTo: integer('assigned_to').references(() => users.id),
+  referredBy: integer('referred_by').references(() => users.id),
+  priceGhs: numeric('price_ghs', { precision: 10, scale: 2 }),
+  commissionGhs: numeric('commission_ghs', { precision: 10, scale: 2 }),
+  paidAt: timestamp('paid_at'),
   createdAt: timestamp('created_at').defaultNow(),
+})
+
+// Staff announcements (field = null means everyone)
+export const announcements = pgTable('announcements', {
+  id: serial('id').primaryKey(),
+  title: varchar('title', { length: 120 }).notNull(),
+  body: text('body').notNull(),
+  field: varchar('field', { length: 30 }),
+  createdBy: integer('created_by').references(() => users.id),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})
+
+// Web Push subscriptions (one per staff browser/device)
+export const pushSubscriptions = pgTable('push_subscriptions', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  endpoint: text('endpoint').notNull().unique(),
+  p256dh: text('p256dh').notNull(),
+  auth: text('auth').notNull(),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
 })
 
 export const staffAccounts = pgTable('staff_accounts', {

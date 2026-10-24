@@ -1,13 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowRight,
-  BarChart3,
   BookOpen,
   Check,
-  ChevronDown,
-  Clock3,
   Code2,
   FileText,
   KeyRound,
@@ -16,20 +13,17 @@ import {
   MessageCircle,
   Paperclip,
   Pencil,
-  Plus,
   Send,
-  Settings2,
   ShieldCheck,
   Sparkles,
-  Users,
   X,
   Zap,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type Track = 'academic' | 'media' | 'systems'
 type Channel = 'whatsapp' | 'telegram' | 'instagram'
-type Role = 'Super Admin' | 'Academic Lead' | 'IT/Graphics Lead' | 'Field Specialist'
-type Ticket = { id: string; track: Track; title: string; scope: string; urgency: string; status: string; assignee: string }
+type Settings = { whatsapp: string; telegram: string; instagram: string; snapchat: string }
 
 const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
 const tracks = [
@@ -37,15 +31,29 @@ const tracks = [
   { id: 'media' as Track, title: 'Presentations & Visuals', subtitle: 'Defense decks, infographics, media', icon: FileText, color: 'from-violet-400/20 to-fuchsia-500/10' },
   { id: 'systems' as Track, title: 'Software, IT & Hands-on', subtitle: 'Coding, web systems, databases', icon: Code2, color: 'from-emerald-400/20 to-teal-500/10' },
 ]
-const seedTickets: Ticket[] = [
-  { id: '#GN-1042', track: 'academic', title: 'Literature review and synthesis', scope: '12 pages', urgency: 'Standard', status: 'Pending Quote', assignee: 'Unassigned' },
-  { id: '#GN-1043', track: 'systems', title: 'Inventory dashboard build', scope: 'Level 8', urgency: 'Express', status: 'In Progress', assignee: 'K. Mensah' },
-  { id: '#GN-1044', track: 'media', title: 'Project defense presentation', scope: '18 slides', urgency: 'Standard', status: 'Assigned', assignee: 'A. Owusu' },
-]
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
+const DEFAULT_SETTINGS: Settings = { whatsapp: '233206478727', telegram: 'GeminiNexusAdmin', instagram: 'GeminiNexusAdmin', snapchat: 'GeminiNexus' }
+const MAX_FILE_BYTES = 50 * 1024 * 1024
+const REF_KEY = 'inquire_ref'
+const REF_DAYS = 30
+
+// Remember which agent's link brought the client here (30 days)
+function readReferral(): string {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REF_KEY) || 'null')
+    if (saved?.code && Date.now() - saved.at < REF_DAYS * 86_400_000) return saved.code
+  } catch {}
+  return ''
+}
+
+function channelHref(channel: Channel, settings: Settings, message: string) {
+  const text = encodeURIComponent(message)
+  if (channel === 'whatsapp') return `https://wa.me/${settings.whatsapp}?text=${text}`
+  if (channel === 'telegram') return `https://telegram.me/${settings.telegram}?text=${text}`
+  return `https://ig.me/m/${settings.instagram}`
+}
 
 export default function Page() {
-  const [view, setView] = useState<'client' | 'admin'>('client')
   const [mobileNav, setMobileNav] = useState(false)
   const [step, setStep] = useState(0)
   const [track, setTrack] = useState<Track>('academic')
@@ -53,78 +61,124 @@ export default function Page() {
   const [brief, setBrief] = useState('')
   const [contact, setContact] = useState('')
   const [urgency, setUrgency] = useState('Standard')
-  const [fileName, setFileName] = useState('')
+  const [file, setFile] = useState<File | null>(null)
   const [channel, setChannel] = useState<Channel | null>(null)
+  const [ticketId, setTicketId] = useState('')
   const [sent, setSent] = useState(false)
-  const [adminOpen, setAdminOpen] = useState(false)
-  const [adminAuthenticated, setAdminAuthenticated] = useState(false)
-  const [code, setCode] = useState('')
-  const [authError, setAuthError] = useState('')
-  const [authLoading, setAuthLoading] = useState(false)
-  const [tickets, setTickets] = useState(seedTickets)
-  const role: Role = 'Super Admin'
-  const [tab, setTab] = useState('Overview')
-  const [settings, setSettings] = useState({ whatsapp: '233206478727', telegram: 'GeminiNexusAdmin', instagram: 'GeminiNexusAdmin', snapchat: 'GeminiNexus' })
-  const [accounts, setAccounts] = useState<any[]>([])
-  const [accountError, setAccountError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState('')
+  const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref')
+    if (ref && /^[A-Za-z0-9]{4,20}$/.test(ref)) {
+      localStorage.setItem(REF_KEY, JSON.stringify({ code: ref.toUpperCase(), at: Date.now() }))
+    }
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => data && setSettings((current) => ({ ...current, ...data })))
+      .catch(() => undefined)
+  }, [])
+
   const socialLinks = [
-    { label: 'Live Chat', href: '/chat' },
     { label: 'WhatsApp', href: `https://wa.me/${settings.whatsapp}?text=Hello%20Gemini%20Nexus%2C%20I%20want%20to%20request%20a%20quote` },
     { label: 'Telegram', href: `https://telegram.me/${settings.telegram}?text=Hello%20Gemini%20Nexus%2C%20I%20want%20to%20request%20a%20quote` },
-    { label: 'Instagram', href: 'https://instagram.com/direct/inbox/' },
+    { label: 'Instagram', href: `https://ig.me/m/${settings.instagram}` },
     { label: 'Snapchat', href: `https://snapchat.com/add/${settings.snapchat}` },
   ]
   const selectedTrack = tracks.find((item) => item.id === track) ?? tracks[0]
   const scopeText = track === 'academic' ? `${scope}${scope === 20 ? '+' : ''} pages` : `Level ${scope}/20`
-  const stats = useMemo(() => ({ total: tickets.length + 39, pending: tickets.filter((item) => item.status === 'Pending Quote').length + 8, active: 3, payout: 'GHS 18,420' }), [tickets])
+  const continueHref = channel
+    ? channelHref(channel, settings, `Hello Gemini Nexus, I just submitted brief ${ticketId} (${selectedTrack.title}, ${scopeText}, ${urgency}).`)
+    : '/chat'
+
+  const selectFile = (next: File | null) => {
+    setError('')
+    if (next && next.size > MAX_FILE_BYTES) {
+      setError('That file is over 50 MB. Zip it, compress it, or send it through Live Chat.')
+      setFile(null)
+      return
+    }
+    setFile(next)
+  }
 
   const dispatch = async (nextChannel: Channel) => {
-    setChannel(nextChannel)
-    await fetch('/api/submissions', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: track, serviceType: selectedTrack.title, scope: scopeText, urgency, clientContact: contact, briefDetails: brief, fileUrls: fileName ? `Attachment selected: ${fileName}` : '' }) }).catch(() => undefined)
-    setSent(true)
-    setTickets((items) => [...items, { id: `#GN-${1045 + items.length}`, track, title: selectedTrack.title, scope: scopeText, urgency, status: 'Pending Quote', assignee: 'Unassigned' }])
+    if (submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      let fileUrls = ''
+      if (file) {
+        const supabase = createClient()
+        const path = `intake/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+        const { error: uploadError } = await supabase.storage.from('uploads').upload(path, file, { upsert: false })
+        if (uploadError) throw new Error('Your file could not be uploaded. Try again, or remove it and send it through Live Chat.')
+        fileUrls = supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl
+      }
+      const response = await fetch('/api/submissions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category: track, serviceType: selectedTrack.title, scope: scopeText, urgency, clientContact: contact, briefDetails: brief, fileUrls, ref: readReferral() }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || 'We could not send your brief. Please try again.')
+      setTicketId(data.ticketId || '')
+      setChannel(nextChannel)
+      setSent(true)
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Something went wrong. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  useEffect(() => {
-    fetch('/api/admin/session').then((response) => response.json()).then((data) => { setAdminAuthenticated(Boolean(data.authenticated)); if (data.authenticated) fetch('/api/admin/accounts').then(async (response) => { const payload = await response.json().catch(() => []); return response.ok && Array.isArray(payload) ? payload : [] }).then((payload) => setAccounts(payload)).catch(() => setAccounts([])) }).catch(() => setAdminAuthenticated(false))
-    fetch('/api/settings').then((response) => response.json()).then((data) => setSettings((current) => ({ ...current, ...data }))).catch(() => undefined)
-  }, [])
-
-  const authenticate = async () => {
-    setAuthLoading(true)
-    setAuthError('')
-    const response = await fetch('/api/admin/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ passcode: code }) })
-    if (!response.ok) setAuthError('Only the super admin passcode can unlock this workspace.')
-    else { setAdminAuthenticated(true); setView('admin'); setAdminOpen(false); setCode('') }
-    setAuthLoading(false)
-  }
-
-  const logout = async () => {
-    await fetch('/api/admin/session', { method: 'DELETE' })
-    setAdminAuthenticated(false)
-    setView('client')
+  const reset = () => {
+    setSent(false)
+    setStep(0)
+    setBrief('')
+    setContact('')
+    setFile(null)
+    setTicketId('')
+    setChannel(null)
+    setError('')
   }
 
   return <main className="min-h-screen overflow-x-hidden bg-[#06121d] text-slate-100 selection:bg-cyan-300 selection:text-slate-950">
     <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden"><div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" /><div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" /><div className="absolute bottom-0 left-1/2 size-80 rounded-full bg-violet-500/10 blur-[130px]" /></div>
-    <header className={`sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl`}><div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8"><button onClick={() => setView('client')} className="flex items-center gap-3 text-left"><img src={logoUrl} alt="Gemini Nexus" className="size-10 rounded-xl object-cover" /><span><strong className="block text-sm tracking-tight">Gemini Nexus</strong><small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small></span></button><nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex"><button onClick={() => setView('client')} className="hover:text-white">Intake portal</button><button onClick={() => setTab('Workflow')} className="hover:text-white">How it works</button><span className="flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"><span className="size-1.5 rounded-full bg-emerald-300" /> Intake line active</span></nav><div className="flex items-center gap-2"><a href="/auth/signin" aria-label="Staff access" className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-300"><KeyRound className="size-4" /></a><button aria-label="Open navigation" onClick={() => setMobileNav(!mobileNav)} className="rounded-xl border border-white/10 p-2 md:hidden"><Menu className="size-4" /></button></div></div>{mobileNav && <div className="border-t border-white/10 px-5 py-4 md:hidden"><button onClick={() => { setView('client'); setMobileNav(false) }} className="text-sm text-slate-300">Intake portal</button></div>}</header>
-    {view === 'admin' && adminAuthenticated ? <AdminDashboard role={role} tab={tab} setTab={setTab} tickets={tickets} setTickets={setTickets} stats={stats} settings={settings} setSettings={setSettings} accounts={accounts} setAccounts={setAccounts} accountError={accountError} setAccountError={setAccountError} exit={logout} /> : <ClientPortal socialLinks={socialLinks} step={step} setStep={setStep} track={track} setTrack={setTrack} scope={scope} setScope={setScope} scopeText={scopeText} selectedTrack={selectedTrack} brief={brief} setBrief={setBrief} contact={contact} setContact={setContact} urgency={urgency} setUrgency={setUrgency} fileName={fileName} setFileName={setFileName} sent={sent} channel={channel} dispatch={dispatch} reset={() => { setSent(false); setStep(0); setBrief(''); setContact(''); setFileName('') }} />}
+    <header className="sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
+        <a href="/" className="flex items-center gap-3 text-left"><img src={logoUrl} alt="Gemini Nexus" width={40} height={40} className="size-10 rounded-xl object-cover" /><span><strong className="block text-sm tracking-tight">Gemini Nexus</strong><small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small></span></a>
+        <nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
+          <a href="/" className="hover:text-white">Intake portal</a>
+          <a href="/workflow" className="hover:text-white">How it works</a>
+          <a href="/chat" className="hover:text-white">Live chat</a>
+          <span className="flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"><span className="size-1.5 rounded-full bg-emerald-300" /> Intake line active</span>
+        </nav>
+        <div className="flex items-center gap-2">
+          <a href="/auth/signin" aria-label="Staff sign in" title="Staff sign in" className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-300"><KeyRound className="size-4" /></a>
+          <button aria-label={mobileNav ? 'Close navigation' : 'Open navigation'} aria-expanded={mobileNav} onClick={() => setMobileNav(!mobileNav)} className="rounded-xl border border-white/10 p-2 md:hidden">{mobileNav ? <X className="size-4" /> : <Menu className="size-4" />}</button>
+        </div>
+      </div>
+      {mobileNav && <nav className="flex flex-col gap-1 border-t border-white/10 px-5 py-3 text-sm text-slate-300 md:hidden">
+        <a href="/" className="rounded-lg px-2 py-2 hover:bg-white/5">Intake portal</a>
+        <a href="/workflow" className="rounded-lg px-2 py-2 hover:bg-white/5">How it works</a>
+        <a href="/chat" className="rounded-lg px-2 py-2 hover:bg-white/5">Live chat</a>
+        <a href="/auth/signin" className="rounded-lg px-2 py-2 hover:bg-white/5">Staff sign in</a>
+      </nav>}
+    </header>
+    <ClientPortal socialLinks={socialLinks} step={step} setStep={setStep} track={track} setTrack={setTrack} scope={scope} setScope={setScope} scopeText={scopeText} brief={brief} setBrief={setBrief} contact={contact} setContact={setContact} urgency={urgency} setUrgency={setUrgency} file={file} setFile={selectFile} sent={sent} channel={channel} dispatch={dispatch} reset={reset} submitting={submitting} error={error} ticketId={ticketId} continueHref={continueHref} />
   </main>
 }
 
-function ClientPortal({ socialLinks, step, setStep, track, setTrack, scope, setScope, scopeText, selectedTrack, brief, setBrief, contact, setContact, urgency, setUrgency, fileName, setFileName, sent, channel, dispatch, reset }: any) {
-  if (sent) return <section className="mx-auto flex min-h-[calc(100vh-75px)] max-w-2xl items-center justify-center px-5 py-16"><div className={`${glass} w-full rounded-[2rem] p-10 text-center`}><div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-300/15 text-emerald-300"><Check className="size-8" /></div><p className="mt-7 text-xs font-bold uppercase tracking-[.2em] text-cyan-300">Dispatch confirmed via {channel}</p><h1 className="mt-3 text-3xl font-bold tracking-tight">Your brief is in the queue.</h1><p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-400">A Gemini Nexus specialist will review your request and respond with a custom GHS quote. No deposit required.</p><button onClick={reset} className="mt-8 rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold hover:border-cyan-300/50">Submit another request</button></div></section>
+function ClientPortal({ socialLinks, step, setStep, track, setTrack, scope, setScope, scopeText, brief, setBrief, contact, setContact, urgency, setUrgency, file, setFile, sent, channel, dispatch, reset, submitting, error, ticketId, continueHref }: any) {
+  if (sent) return <section className="mx-auto flex min-h-[calc(100vh-75px)] max-w-2xl items-center justify-center px-5 py-16"><div className={`${glass} w-full rounded-[2rem] p-10 text-center`}><div className="mx-auto flex size-16 items-center justify-center rounded-full bg-emerald-300/15 text-emerald-300"><Check className="size-8" /></div><p className="mt-7 text-xs font-bold uppercase tracking-[.2em] text-cyan-300">Brief received{ticketId ? ` · ${ticketId}` : ''}</p><h1 className="mt-3 text-3xl font-bold tracking-tight">Your brief is in the queue.</h1><p className="mx-auto mt-4 max-w-md text-sm leading-6 text-slate-400">A Gemini Nexus specialist will review it and send a custom GHS quote. No deposit required. Message us on {channel} with your ticket number to speed things up.</p><div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row"><a href={continueHref} target="_blank" rel="noreferrer" className="flex items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-200">Continue on {channel} <ArrowRight className="size-4" /></a><a href="/chat" className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold hover:border-cyan-300/50"><MessageCircle className="size-4" /> Live chat</a></div><button onClick={reset} className="mt-6 text-xs font-semibold text-slate-500 hover:text-white">Submit another request</button></div></section>
   const steps = ['Track & scope', 'Brief & files', 'Dispatch details']
-  return <><section aria-label="Direct contact channels" className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-5 pt-5 lg:px-8"><span className="mr-2 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Direct chat</span>{socialLinks.map((link: { label: string; href: string }) => <a key={link.label} href={link.href} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 bg-white/[.04] px-3 py-1.5 text-xs text-slate-300 transition hover:border-cyan-300/50 hover:text-cyan-200">{link.label}</a>)}</section><section className="relative mx-auto max-w-7xl px-5 pb-16 pt-16 lg:px-8 lg:pb-24 lg:pt-24"><div className="max-w-3xl"><span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200"><Sparkles className="size-3.5" /> Ghana operational · custom GHS quotes</span><h1 className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-7xl">Serious work.<br /><span className="bg-gradient-to-r from-cyan-200 via-white to-indigo-300 bg-clip-text text-transparent">Right specialist.</span></h1><p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">One secure intake line for academic research, visual media, and technical systems support. Tell us what needs moving forward.</p></div></section><section className="mx-auto grid max-w-7xl items-start gap-7 px-5 pb-20 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8"><aside className="flex flex-col gap-5 lg:sticky lg:top-24"><div className={`${glass} rounded-3xl p-5`}><p className="text-sm font-bold text-white">Why teams use Nexus</p>{[['Direct specialist routing', Zap], ['Confidential by default', LockKeyhole], ['Original, tailored work', Pencil], ['Progress updates included', MessageCircle]].map(([label, Icon]: any) => <div key={label} className="mt-5 flex items-center gap-3 text-sm text-slate-400"><span className="flex size-9 items-center justify-center rounded-xl bg-white/10 text-cyan-300"><Icon className="size-4" /></span>{label}</div>)}</div><div className={`${glass} rounded-3xl p-5`}><div className="flex items-center gap-2 text-sm font-bold"><ShieldCheck className="size-4 text-emerald-300" /> Private intake</div><p className="mt-2 text-xs leading-5 text-slate-500">Client identities stay hidden from delivery teams until you choose a response channel.</p></div></aside><div className={`${glass} rounded-[2rem] p-5 sm:p-8`}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Request intake</p><h2 className="mt-2 text-xl font-bold">Start a new brief</h2></div><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-400">{step + 1} / 3</span></div><div className="mt-7 grid grid-cols-3 gap-2">{steps.map((item, index) => <button key={item} onClick={() => index <= step && setStep(index)} className={`rounded-full py-2 text-left text-[11px] font-semibold transition ${index <= step ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-500'}`}><span className="ml-3">{index + 1}. {item}</span></button>)}</div>{step === 0 && <TrackForm track={track} setTrack={setTrack} scope={scope} setScope={setScope} scopeText={scopeText} />}{step === 1 && <BriefForm brief={brief} setBrief={setBrief} fileName={fileName} setFileName={setFileName} />}{step === 2 && <DispatchForm contact={contact} setContact={setContact} urgency={urgency} setUrgency={setUrgency} />}{step < 2 ? <button onClick={() => setStep(step + 1)} className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 font-bold text-slate-950 transition hover:bg-cyan-200">Continue <ArrowRight className="size-4" /></button> : <div className="mt-8"><p className="mb-3 text-center text-xs text-slate-500">Custom GHS quote via preferred connector · Zero deposit required</p><div className="grid gap-3 sm:grid-cols-3"><button onClick={() => dispatch('whatsapp')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-400 font-bold text-slate-950 hover:bg-emerald-300"><MessageCircle className="size-4" /> WhatsApp</button><button onClick={() => dispatch('telegram')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-400 font-bold text-slate-950 hover:bg-sky-300"><Send className="size-4" /> Telegram</button><button onClick={() => dispatch('instagram')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-fuchsia-400 font-bold text-slate-950 hover:bg-fuchsia-300"><MessageCircle className="size-4" /> Instagram</button></div></div>}</div></section></>
+  return <><section aria-label="Direct contact channels" className="mx-auto flex max-w-7xl flex-wrap items-center gap-2 px-5 pt-5 lg:px-8"><span className="mr-2 text-xs font-semibold uppercase tracking-[.16em] text-slate-500">Direct chat</span><a href="/chat" className="flex items-center gap-1.5 rounded-full border border-cyan-300/50 bg-cyan-300/15 px-3 py-1.5 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/25"><span className="size-1.5 animate-pulse rounded-full bg-emerald-300" /> Live chat with an agent</a>{socialLinks.map((link: { label: string; href: string }) => <a key={link.label} href={link.href} target="_blank" rel="noreferrer" className="rounded-full border border-white/10 bg-white/[.04] px-3 py-1.5 text-xs text-slate-300 transition hover:border-cyan-300/50 hover:text-cyan-200">{link.label}</a>)}</section><section className="relative mx-auto max-w-7xl px-5 pb-16 pt-16 lg:px-8 lg:pb-24 lg:pt-24"><div className="max-w-3xl"><span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200"><Sparkles className="size-3.5" /> Ghana operational · custom GHS quotes</span><h1 className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-7xl">Serious work.<br /><span className="bg-gradient-to-r from-cyan-200 via-white to-indigo-300 bg-clip-text text-transparent">Right specialist.</span></h1><p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">One secure intake line for academic research, visual media, and technical systems support. Tell us what needs moving forward.</p></div></section><section className="mx-auto grid max-w-7xl items-start gap-7 px-5 pb-20 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8"><aside className="flex flex-col gap-5 lg:sticky lg:top-24"><div className={`${glass} rounded-3xl p-5`}><p className="text-sm font-bold text-white">Why teams use Nexus</p>{[['Direct specialist routing', Zap], ['Confidential by default', LockKeyhole], ['Original, tailored work', Pencil], ['Progress updates included', MessageCircle]].map(([label, Icon]: any) => <div key={label} className="mt-5 flex items-center gap-3 text-sm text-slate-400"><span className="flex size-9 items-center justify-center rounded-xl bg-white/10 text-cyan-300"><Icon className="size-4" /></span>{label}</div>)}</div><div className={`${glass} rounded-3xl p-5`}><div className="flex items-center gap-2 text-sm font-bold"><ShieldCheck className="size-4 text-emerald-300" /> Private intake</div><p className="mt-2 text-xs leading-5 text-slate-500">Client identities stay hidden from delivery teams until you choose a response channel.</p></div></aside><div className={`${glass} rounded-[2rem] p-5 sm:p-8`}><div className="flex items-center justify-between gap-4"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Request intake</p><h2 className="mt-2 text-xl font-bold">Start a new brief</h2></div><span className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-400">{step + 1} / 3</span></div><div className="mt-7 grid grid-cols-3 gap-2">{steps.map((item, index) => <button key={item} onClick={() => index <= step && setStep(index)} className={`rounded-full py-2 text-left text-[11px] font-semibold transition ${index <= step ? 'bg-cyan-300 text-slate-950' : 'bg-white/10 text-slate-500'}`}><span className="ml-3">{index + 1}. {item}</span></button>)}</div>{step === 0 && <TrackForm track={track} setTrack={setTrack} scope={scope} setScope={setScope} scopeText={scopeText} />}{step === 1 && <BriefForm brief={brief} setBrief={setBrief} file={file} setFile={setFile} />}{step === 2 && <DispatchForm contact={contact} setContact={setContact} urgency={urgency} setUrgency={setUrgency} />}{error && <p role="alert" className="mt-6 rounded-xl border border-rose-300/30 bg-rose-300/10 px-4 py-3 text-sm text-rose-200">{error}</p>}{step < 2 ? <button onClick={() => setStep(step + 1)} className="mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 font-bold text-slate-950 transition hover:bg-cyan-200">Continue <ArrowRight className="size-4" /></button> : <div className="mt-8"><p className="mb-3 text-center text-xs text-slate-500">{submitting ? 'Sending your brief…' : 'Custom GHS quote via preferred connector · Zero deposit required'}</p><div className="grid gap-3 sm:grid-cols-3"><button disabled={submitting} onClick={() => dispatch('whatsapp')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-emerald-400 font-bold text-slate-950 hover:bg-emerald-300 disabled:cursor-wait disabled:opacity-50"><MessageCircle className="size-4" /> WhatsApp</button><button disabled={submitting} onClick={() => dispatch('telegram')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-sky-400 font-bold text-slate-950 hover:bg-sky-300 disabled:cursor-wait disabled:opacity-50"><Send className="size-4" /> Telegram</button><button disabled={submitting} onClick={() => dispatch('instagram')} className="flex h-12 items-center justify-center gap-2 rounded-2xl bg-fuchsia-400 font-bold text-slate-950 hover:bg-fuchsia-300 disabled:cursor-wait disabled:opacity-50"><MessageCircle className="size-4" /> Instagram</button></div></div>}</div></section></>
 }
 
 function TrackForm({ track, setTrack, scope, setScope, scopeText }: any) { return <div className="mt-8"><p className="text-sm font-semibold text-slate-300">Choose a service track</p><div className="mt-4 grid gap-3 md:grid-cols-3">{tracks.map((item) => { const Icon = item.icon; const selected = item.id === track; return <button key={item.id} onClick={() => setTrack(item.id)} aria-pressed={selected} className={`rounded-2xl border bg-gradient-to-br p-4 text-left transition hover:-translate-y-0.5 ${item.color} ${selected ? 'border-cyan-300/70 ring-1 ring-cyan-300/40' : 'border-white/10'}`}><span className="flex size-10 items-center justify-center rounded-xl bg-black/20 text-cyan-200"><Icon className="size-5" /></span><strong className="mt-4 block text-sm text-white">{item.title}</strong><span className="mt-1 block text-xs leading-5 text-slate-400">{item.subtitle}</span>{selected && <span className="mt-4 flex items-center gap-1 text-[11px] font-bold text-cyan-300"><Check className="size-3" /> Selected</span>}</button>})}</div><div className="mt-7 rounded-2xl border border-white/10 bg-black/15 p-5"><div className="flex items-center justify-between"><label htmlFor="scope" className="text-sm font-semibold">Scope or complexity</label><span className="rounded-lg bg-cyan-300/10 px-2.5 py-1 text-xs font-bold text-cyan-200">{scopeText}</span></div><input id="scope" type="range" min="1" max="20" value={scope} onChange={(event) => setScope(Number(event.target.value))} className="mt-5 h-2 w-full accent-cyan-300" /></div></div> }
-function BriefForm({ brief, setBrief, fileName, setFileName }: any) { return <div className="mt-8"><label htmlFor="brief" className="text-sm font-semibold text-slate-300">Assignment brief or project requirements</label><textarea id="brief" value={brief} onChange={(event) => setBrief(event.target.value)} maxLength={1600} placeholder="Paste the prompt, success criteria, links, or system requirements..." className="mt-3 min-h-48 w-full resize-y rounded-2xl border border-white/10 bg-black/15 p-4 text-sm leading-6 text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60" /><label htmlFor="attachment" className="mt-5 flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/20 bg-white/[.03] p-6 text-center text-sm text-slate-400 hover:border-cyan-300/50"><Paperclip className="size-5 text-cyan-300" /><span>{fileName || 'Attach rubric, dataset, or code files'}</span><span className="text-xs text-slate-600">Works on phones, tablets, and laptops · PDF, DOCX, ZIP, images</span><input id="attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.png,.jpg,.jpeg,.webp,.txt" className="sr-only" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')} /></label></div> }
+function BriefForm({ brief, setBrief, file, setFile }: any) { return <div className="mt-8"><label htmlFor="brief" className="text-sm font-semibold text-slate-300">Assignment brief or project requirements</label><textarea id="brief" value={brief} onChange={(event) => setBrief(event.target.value)} maxLength={1600} placeholder="Paste the prompt, success criteria, links, or system requirements..." className="mt-3 min-h-48 w-full resize-y rounded-2xl border border-white/10 bg-black/15 p-4 text-sm leading-6 text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60" /><label htmlFor="attachment" className="mt-5 flex w-full cursor-pointer flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-white/20 bg-white/[.03] p-6 text-center text-sm text-slate-400 hover:border-cyan-300/50"><Paperclip className="size-5 text-cyan-300" /><span>{file ? file.name : 'Attach rubric, dataset, or code files'}</span><span className="text-xs text-slate-600">Up to 50 MB · PDF, DOCX, ZIP, images · uploaded securely when you submit</span><input id="attachment" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.png,.jpg,.jpeg,.webp,.txt" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /></label>{file && <button type="button" onClick={() => setFile(null)} className="mt-2 text-xs text-slate-500 hover:text-rose-300">Remove file</button>}</div> }
 function DispatchForm({ contact, setContact, urgency, setUrgency }: any) { return <div className="mt-8"><label htmlFor="contact" className="text-sm font-semibold text-slate-300">Preferred WhatsApp or Telegram handle</label><input id="contact" value={contact} onChange={(event) => setContact(event.target.value)} placeholder="e.g. +233 20 647 8727 or @yourhandle" className="mt-3 h-12 w-full rounded-2xl border border-white/10 bg-black/15 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60" /><p className="mt-7 text-sm font-semibold text-slate-300">Response urgency</p><div className="mt-3 grid gap-3 sm:grid-cols-3">{['Standard', 'Express', 'Emergency'].map((item) => <button key={item} onClick={() => setUrgency(item)} aria-pressed={urgency === item} className={`rounded-2xl border p-4 text-left ${urgency === item ? 'border-cyan-300/70 bg-cyan-300/10' : 'border-white/10 bg-white/[.03]'}`}><strong className="block text-sm">{item}</strong><span className="mt-1 block text-xs text-slate-500">{item === 'Standard' ? '3–5 business days' : item === 'Express' ? '24–48 hours' : 'Under 24 hours'}</span></button>)}</div></div> }
-
-function AdminDashboard({ role, tab, setTab, tickets, setTickets, stats, settings, setSettings, accounts, setAccounts, accountError, setAccountError, exit }: any) { const nav = ['Overview', 'Task allocation', 'Connectors', 'Team access']; const visible = tickets; return <section className="mx-auto flex max-w-7xl gap-6 px-5 py-8 lg:px-8"><aside className={`${glass} hidden w-60 shrink-0 rounded-3xl p-4 lg:block`}><div className="mb-8 flex items-center gap-2 px-3"><BarChart3 className="size-5 text-cyan-300" /><span className="text-sm font-bold">Operations</span></div><div className="flex flex-col gap-1">{nav.map((item) => <button key={item} onClick={() => setTab(item)} className={`flex items-center gap-3 rounded-xl px-3 py-3 text-left text-sm ${tab === item ? 'bg-cyan-300/15 text-cyan-200' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`}>{item === 'Overview' ? <BarChart3 className="size-4" /> : item === 'Task allocation' ? <Zap className="size-4" /> : item === 'Connectors' ? <Settings2 className="size-4" /> : <Users className="size-4" />}{item}</button>)}</div><button onClick={exit} className="mt-10 flex items-center gap-2 px-3 text-xs text-slate-500 hover:text-white"><ArrowRight className="size-3 rotate-180" /> Exit workspace</button></aside><div className="min-w-0 flex-1"><div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Internal workspace</p><h1 className="mt-2 text-3xl font-bold tracking-tight">{tab}</h1><p className="mt-2 text-sm text-slate-400">Secure routing layer · identities anonymized for delivery teams</p></div><div className="flex items-center gap-2"><select value={role} aria-label="Current role" className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white outline-none"><option className="bg-slate-900">Super Admin</option><option className="bg-slate-900">Academic Lead</option><option className="bg-slate-900">IT/Graphics Lead</option><option className="bg-slate-900">Field Specialist</option></select><span className="flex size-9 items-center justify-center rounded-xl bg-cyan-300/15 text-cyan-200"><Users className="size-4" /></span></div></div>{tab === 'Overview' && <Overview stats={stats} tickets={visible} setTab={setTab} />}{tab === 'Task allocation' && <Allocation tickets={visible} setTickets={setTickets} />}{tab === 'Connectors' && <Connectors settings={settings} setSettings={setSettings} />}{tab === 'Team access' && <TeamAccess />}</div></section> }
-function Overview({ stats, tickets, setTab }: any) { return <div className="mt-8"><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[['Total tickets', stats.total, BarChart3], ['Pending quotes', stats.pending, Clock3], ['Active connectors', stats.active, Send], ['Payout tracking', stats.payout, Zap]].map(([label, value, Icon]: any) => <div key={label} className={`${glass} rounded-2xl p-5`}><div className="flex items-center justify-between"><span className="text-xs text-slate-500">{label}</span><Icon className="size-4 text-cyan-300" /></div><p className="mt-4 text-2xl font-bold">{value}</p><p className="mt-2 text-[11px] text-emerald-300">↑ Live network data</p></div>)}</div><div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}><div className="flex items-center justify-between"><div><h2 className="font-bold">Latest incoming work</h2><p className="mt-1 text-xs text-slate-500">Personal identities are hidden from this view.</p></div><button onClick={() => setTab('Task allocation')} className="text-xs font-bold text-cyan-300">View queue <ArrowRight className="ml-1 inline size-3" /></button></div><TicketTable tickets={tickets.slice(-4)} /></div></div> }
-function Allocation({ tickets, setTickets }: any) { return <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}><div className="flex items-center justify-between"><div><h2 className="font-bold">Delegation queue</h2><p className="mt-1 text-xs text-slate-500">Assign work without revealing client contact details.</p></div><button className="flex items-center gap-2 rounded-xl bg-cyan-300 px-3 py-2 text-xs font-bold text-slate-950"><Plus className="size-3" /> New allocation</button></div><TicketTable tickets={tickets} editable setTickets={setTickets} /></div> }
-function TicketTable({ tickets, editable, setTickets }: any) { return <div className="mt-6 overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-500"><tr><th className="pb-3">Ticket</th><th className="pb-3">Request</th><th className="pb-3">Scope</th><th className="pb-3">Status</th><th className="pb-3">Assignee</th></tr></thead><tbody>{tickets.map((ticket: Ticket) => <tr key={ticket.id} className="border-b border-white/5"><td className="py-4 font-mono text-xs text-cyan-200">{ticket.id}</td><td className="py-4"><strong className="block text-sm">{ticket.title}</strong><span className="text-xs text-slate-500">{ticket.track}</span></td><td className="py-4 text-xs text-slate-400">{ticket.scope} · {ticket.urgency}</td><td className="py-4"><span className="rounded-full bg-white/10 px-2 py-1 text-[11px] text-slate-300">{ticket.status}</span></td><td className="py-4">{editable ? <select value={ticket.assignee} onChange={(event) => setTickets((items: Ticket[]) => items.map((item) => item.id === ticket.id ? { ...item, assignee: event.target.value, status: 'Assigned' } : item))} className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-xs text-white"><option className="bg-slate-900">Unassigned</option><option className="bg-slate-900">K. Mensah</option><option className="bg-slate-900">A. Owusu</option><option className="bg-slate-900">E. Boateng</option></select> : <span className="text-xs text-slate-400">{ticket.assignee}</span>}</td></tr>)}</tbody></table></div> }
-function Connectors({ settings, setSettings, role = 'Super Admin' }: any) { const canEdit = role === 'Super Admin'; return <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_280px]"><div className={`${glass} rounded-3xl p-5 sm:p-6`}><div className="flex items-center justify-between"><div><h2 className="font-bold">Preferred connectors</h2><p className="mt-1 text-xs text-slate-500">Where client requests are dispatched.</p></div><span className="rounded-full bg-emerald-300/10 px-2.5 py-1 text-[11px] font-bold text-emerald-300">3 active</span></div><div className="mt-6 grid gap-4 sm:grid-cols-2">{[['WhatsApp number', 'whatsapp', '233206478727'], ['Telegram admin handle', 'telegram', 'GeminiNexusAdmin'], ['Instagram handle', 'instagram', 'GeminiNexusAdmin'], ['Snapchat username', 'snapchat', 'GeminiNexus']].map(([label, key, placeholder]) => <label key={key} className="text-xs font-semibold text-slate-400">{label}<input value={settings[key]} onChange={(event) => setSettings({ ...settings, [key]: event.target.value })} placeholder={placeholder} disabled={!canEdit} className="mt-2 h-11 w-full rounded-xl border border-white/10 bg-black/15 px-3 text-sm font-normal text-white outline-none focus:border-cyan-300/50 disabled:cursor-not-allowed disabled:opacity-50" /></label>)}</div><button disabled={!canEdit} onClick={async () => { if (canEdit) await fetch('/api/settings', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(settings) }) }} className="mt-6 flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:opacity-50"><Check className="size-4" /> {canEdit ? 'Save connector changes' : 'Super Admin only'}</button></div><div className={`${glass} rounded-3xl p-5`}><ShieldCheck className="size-5 text-emerald-300" /><h3 className="mt-4 font-bold">Secure by default</h3><p className="mt-2 text-xs leading-5 text-slate-500">Bot tokens are encrypted at rest and never shown to clients or delivery teams.</p></div></div> }
-function TeamAccess({ accounts, setAccounts, accountError, setAccountError = () => undefined }: any) { const safeAccounts = Array.isArray(accounts) ? accounts : []; const [form, setForm] = useState({ fullName: '', email: '', role: 'Academic Lead', password: '' }); const [saving, setSaving] = useState(false); const create = async () => { setSaving(true); setAccountError(''); const response = await fetch('/api/admin/accounts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) }); const data = await response.json(); if (!response.ok) setAccountError(data.error || 'Unable to create account.'); else { setAccounts((items: any[]) => [...items, data].sort((a, b) => a.fullName.localeCompare(b.fullName))); setForm({ fullName: '', email: '', role: 'Academic Lead', password: '' }) }; setSaving(false) }; return <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}><div><h2 className="font-bold">Team permissions</h2><p className="mt-1 text-xs text-slate-500">Each staff account has its own role, email, and temporary password. Only the Super Admin can create or disable accounts.</p></div><div className="mt-6 grid gap-3 md:grid-cols-2"><input value={form.fullName} onChange={(e) => setForm({ ...form, fullName: e.target.value })} placeholder="Full name" className="h-11 rounded-xl border border-white/10 bg-black/15 px-3 text-sm outline-none" /><input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Work email" type="email" className="h-11 rounded-xl border border-white/10 bg-black/15 px-3 text-sm outline-none" /><select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="h-11 rounded-xl border border-white/10 bg-black/15 px-3 text-sm"><option>Academic Lead</option><option>IT/Graphics Lead</option><option>Field Specialist</option></select><input value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder="Default password (8+ chars)" type="password" className="h-11 rounded-xl border border-white/10 bg-black/15 px-3 text-sm outline-none" /></div>{accountError && <p className="mt-3 text-xs text-rose-300">{accountError}</p>}<button onClick={create} disabled={saving} className="mt-4 flex items-center gap-2 rounded-xl bg-cyan-300 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-50"><Plus className="size-3" /> {saving ? 'Creating…' : 'Create staff account'}</button><div className="mt-8 grid gap-3 sm:grid-cols-2">{safeAccounts.map((account: any) => <div key={account.id} className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[.03] p-4"><div><p className="text-sm font-semibold">{account.fullName}</p><p className="mt-1 text-xs text-slate-500">{account.role} · {account.email}</p><p className="mt-1 text-[11px] text-amber-300">Default password must be changed on first sign-in</p></div><span className={`rounded-full px-2 py-1 text-[10px] ${account.active ? 'bg-emerald-300/10 text-emerald-300' : 'bg-rose-300/10 text-rose-300'}`}>{account.active ? 'Active' : 'Disabled'}</span></div>)}</div></div> }
