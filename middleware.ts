@@ -5,8 +5,8 @@ export async function middleware(request: NextRequest) {
   return await updateSession(request)
 }
 
+// Only run the session refresh where auth matters. Public pages (/, /chat,
+// /auth/signin, /workflow, public APIs) skip the Supabase round-trip entirely.
 export const config = {
-  matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
+  matcher: ['/dashboard/:path*', '/agent/:path*', '/admin/:path*', '/api/admin/:path*'],
 }

@@ -3,6 +3,9 @@ import { getUser, isAdmin } from '@/lib/auth'
 import { DashboardClient } from './client'
 import { SignOutButton } from './signout-button'
 
+// Signed-in pages read cookies; never prerender them.
+export const dynamic = 'force-dynamic'
+
 export default async function DashboardPage() {
   const user = await getUser()
 

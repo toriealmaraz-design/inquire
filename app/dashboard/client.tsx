@@ -69,6 +69,20 @@ type UploadRow = {
   created_at: string
 }
 
+type IntakeRow = {
+  id: number
+  ticketId: string
+  category: string
+  serviceType: string
+  scope: string | null
+  urgency: string | null
+  clientContact: string | null
+  briefDetails: string | null
+  fileUrls: string | null
+  status: string | null
+  createdAt: string | null
+}
+
 type DbMsg = {
   id: number
   conversation_id: number
@@ -112,6 +126,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [conversations, setConversations] = useState<Convo[]>([])
   const [uploads, setUploads] = useState<UploadRow[]>([])
+  const [intake, setIntake] = useState<IntakeRow[]>([])
   const [unread, setUnread] = useState(0)
   const [notifEnabled, setNotifEnabled] = useState(false)
   const [supabase] = useState(() => createClient())
@@ -170,12 +185,18 @@ export function DashboardClient({ user }: { user: User }) {
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifEnabled(true)
     loadChatData()
+    // Batch bursts of realtime events into one refetch.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const scheduleReload = () => {
+      clearTimeout(timer)
+      timer = setTimeout(loadChatData, 300)
+    }
     const channel = supabase
       .channel('dashboard-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => loadChatData())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, () => loadChatData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        loadChatData()
+        scheduleReload()
         const r = payload.new as DbMsg
         if (r.sender_type === 'client' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           new Notification('New client message', { body: r.content.slice(0, 120) })
@@ -183,6 +204,7 @@ export function DashboardClient({ user }: { user: User }) {
       })
       .subscribe()
     return () => {
+      clearTimeout(timer)
       supabase.removeChannel(channel)
     }
   }, [supabase, loadChatData])
@@ -207,16 +229,14 @@ export function DashboardClient({ user }: { user: User }) {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch users if super admin
-        if (isSuperAdmin) {
-          const usersRes = await fetch('/api/admin/users')
-          const usersData = await usersRes.json()
-          setUsers(Array.isArray(usersData) ? usersData : [])
-        }
-        
-        // Fetch settings
-        const settingsRes = await fetch('/api/settings')
-        const settingsData = await settingsRes.json()
+        // Load everything in parallel instead of one request after another
+        const [usersData, settingsData, intakeData] = await Promise.all([
+          isSuperAdmin ? fetch('/api/admin/users').then((r) => r.json()).catch(() => []) : Promise.resolve([]),
+          fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
+          fetch('/api/submissions').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+        ])
+        setUsers(Array.isArray(usersData) ? usersData : [])
+        setIntake(Array.isArray(intakeData) ? intakeData : [])
         setSettings({
           whatsapp: settingsData.whatsapp || '',
           telegram: settingsData.telegram || '',
@@ -407,7 +427,7 @@ export function DashboardClient({ user }: { user: User }) {
                 ['Active Users', activeCount, Users, 'text-emerald-400'],
                 ['Pending Approval', pendingCount, Clock3, 'text-amber-400'],
                 ['Active Chats', conversations.length, MessageCircle, 'text-blue-400'],
-                ['Submissions', uploads.length, Zap, 'text-violet-400'],
+                ['Briefs', intake.length, Zap, 'text-violet-400'],
               ].map(([label, value, Icon, color]: any) => (
                 <div key={label} className={`${glass} rounded-2xl p-5`}>
                   <div className="flex items-center justify-between">
@@ -538,7 +558,35 @@ export function DashboardClient({ user }: { user: User }) {
           {tab === 'Submissions' && (
             <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
               <h2 className="font-bold">Submissions &amp; Files</h2>
-              <p className="mt-1 text-xs text-slate-500">Files clients and agents uploaded in chat. Download before they expire.</p>
+              <p className="mt-1 text-xs text-slate-500">Briefs from the homepage intake form, then files shared in chat. Download files before they expire.</p>
+              <h3 className="mt-6 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Intake briefs ({intake.length})</h3>
+              {intake.length === 0 ? (
+                <p className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-500">No briefs yet. They appear here as soon as a client submits the homepage form.</p>
+              ) : (
+                <div className="mt-3 flex flex-col gap-3">
+                  {intake.map((s) => (
+                    <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs text-cyan-200">{s.ticketId}</span>
+                          <span className="text-sm font-medium text-white">{s.serviceType}</span>
+                        </div>
+                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">{s.status || 'Pending Quote'}</span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500">
+                        {[s.scope, s.urgency, s.clientContact ? `Contact: ${s.clientContact}` : null, s.createdAt ? fmtTime(s.createdAt) : null].filter(Boolean).join(' · ')}
+                      </p>
+                      {s.briefDetails && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{s.briefDetails}</p>}
+                      {s.fileUrls && /^https?:\/\//.test(s.fileUrls) && (
+                        <a href={s.fileUrls} target="_blank" rel="noopener noreferrer" download className="mt-3 inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500">
+                          <Download className="size-4" /> Download attachment
+                        </a>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <h3 className="mt-8 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Chat files ({uploads.length})</h3>
               {uploads.length === 0 ? (
                 <div className="mt-6 text-center py-12 text-slate-500">
                   <FileText className="size-12 mx-auto mb-4 opacity-50" />

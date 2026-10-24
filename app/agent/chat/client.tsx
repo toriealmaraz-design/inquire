@@ -146,15 +146,19 @@ export function AgentChatClient({ user }: { user: User }) {
   // Initial load + global realtime subscriptions (new convos + all new messages)
   useEffect(() => {
     loadConversations()
+    // Batch bursts of realtime events into one list refetch.
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const scheduleReload = () => {
+      clearTimeout(timer)
+      timer = setTimeout(loadConversations, 300)
+    }
 
     const channel = supabase
       .channel('agent-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        loadConversations()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         const r = payload.new as DbMessage
-        loadConversations()
+        scheduleReload()
         if (activeConvoRef.current === r.conversation_id) {
           setMessages((prev) => (prev.some((m) => m.id === r.id) ? prev : [...prev, rowToMessage(r)]))
         }
@@ -167,6 +171,7 @@ export function AgentChatClient({ user }: { user: User }) {
       .subscribe()
 
     return () => {
+      clearTimeout(timer)
       supabase.removeChannel(channel)
     }
   }, [supabase, loadConversations])

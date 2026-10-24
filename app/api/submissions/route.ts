@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
-import { desc, eq } from 'drizzle-orm'
+import { desc } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { settings, submissions } from '@/lib/db/schema'
-import { requireSuperAdmin } from '@/lib/auth'
+import { submissions } from '@/lib/db/schema'
+import { getUser, isAdmin } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
@@ -11,14 +11,16 @@ function clean(value: unknown, maxLength: number) {
 }
 
 export async function GET() {
-  if (!await requireSuperAdmin()) {
-    return NextResponse.json({ error: 'Super admin access required.' }, { status: 403 })
+  const user = await getUser()
+  if (!user || user.status !== 'active' || !isAdmin(user.role)) {
+    return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
   }
   try {
     const rows = await db.select().from(submissions).orderBy(desc(submissions.createdAt)).limit(100)
     return NextResponse.json(rows)
-  } catch {
-    return NextResponse.json([])
+  } catch (error) {
+    console.error('Submissions fetch failed:', error)
+    return NextResponse.json({ error: 'Could not load submissions.' }, { status: 500 })
   }
 }
 
@@ -53,8 +55,8 @@ export async function POST(request: Request) {
     }).returning()
 
     return NextResponse.json({ submission: created, ticketId }, { status: 201 })
-  } catch {
-    // DB not connected - return mock success
-    return NextResponse.json({ ticketId: `GN-${Date.now() % 10000}`, message: 'Submission received (offline mode)' }, { status: 201 })
+  } catch (error) {
+    console.error('Submission insert failed:', error)
+    return NextResponse.json({ error: 'We could not save your brief. Please try again or use Live Chat.' }, { status: 500 })
   }
 }

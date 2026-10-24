@@ -87,12 +87,17 @@ export function AgentDashboardClient({ user }: { user: User }) {
   useEffect(() => {
     if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifEnabled(true)
     load()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const scheduleReload = () => {
+      clearTimeout(timer)
+      timer = setTimeout(load, 300)
+    }
     const channel = supabase
       .channel('agent-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, () => load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
-        load()
+        scheduleReload()
         const r = payload.new as any
         if (r.sender_type === 'client' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
           new Notification('New client message', { body: String(r.content || '').slice(0, 120) })
@@ -100,6 +105,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
       })
       .subscribe()
     return () => {
+      clearTimeout(timer)
       supabase.removeChannel(channel)
     }
   }, [supabase, load])

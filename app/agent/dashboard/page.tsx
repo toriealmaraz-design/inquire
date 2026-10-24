@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation'
 import { getUser, canChat } from '@/lib/auth'
 import { AgentDashboardClient } from './client'
 
+// Signed-in pages read cookies; never prerender them.
+export const dynamic = 'force-dynamic'
+
 export default async function AgentDashboardPage() {
   const user = await getUser()
 
