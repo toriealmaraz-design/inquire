@@ -12,10 +12,13 @@ function AuthContent() {
   const router = useRouter()
   const redirectTo = searchParams.get('redirectTo') || '/dashboard'
   const initialError = searchParams.get('error')
+  const readableError = initialError && initialError !== 'callback_error'
+    ? initialError.replaceAll('_', ' ')
+    : initialError
   
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(initialError || '')
+  const [error, setError] = useState(readableError || '')
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   
