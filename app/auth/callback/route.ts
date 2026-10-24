@@ -7,29 +7,33 @@ function safePath(value: string | null) {
 }
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const requestUrl = new URL(request.url)
+  const { searchParams } = requestUrl
   const code = searchParams.get('code')
   const redirectTo = safePath(searchParams.get('redirectTo'))
+  const providerError = searchParams.get('error_description') || searchParams.get('error')
 
   const fail = (reason: string) => {
-    const url = new URL('/auth/signin', origin)
+    const url = new URL('/auth/signin', requestUrl.origin)
     url.searchParams.set('error', reason)
     if (redirectTo !== '/dashboard') url.searchParams.set('redirectTo', redirectTo)
     return NextResponse.redirect(url)
   }
 
-  // Google / Supabase sent an error back (e.g. user cancelled, provider misconfigured)
-  const providerError = searchParams.get('error_description') || searchParams.get('error')
   if (providerError) return fail(providerError.slice(0, 200))
-
   if (!code) return fail('missing_code')
 
   const supabase = await createClient()
   const { error } = await supabase.auth.exchangeCodeForSession(code)
+
   if (error) {
     console.error('OAuth code exchange failed:', error.message)
     return fail(/code verifier|pkce/i.test(error.message) ? 'pkce_mismatch' : 'callback_error')
   }
 
-  return NextResponse.redirect(`${origin}${redirectTo}`)
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const forwardedProto = request.headers.get('x-forwarded-proto') || 'https'
+  const appOrigin = forwardedHost ? `${forwardedProto}://${forwardedHost}` : requestUrl.origin
+
+  return NextResponse.redirect(new URL(redirectTo, appOrigin))
 }

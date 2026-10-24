@@ -45,17 +45,22 @@ function AuthContent() {
   const signInWithGoogle = async () => {
     setLoading(true)
     setError('')
-    const supabase = createClient()
-    
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
-      },
-    })
 
-    if (error) {
-      setError(error.message)
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+        },
+      })
+
+      if (error) {
+        setError(`Google sign-in is not available yet: ${error.message}`)
+      }
+    } catch {
+      setError('Google sign-in could not start. Please try again or use email sign-in.')
+    } finally {
       setLoading(false)
     }
   }
