@@ -7,6 +7,8 @@ import { PushPrompt } from '@/components/push-prompt'
 import { SupportPresence } from '@/components/support-presence'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
+import { ChatbotSettings } from '@/components/chatbot-settings'
+import { RoleWatcher } from '@/components/role-watcher'
 import { FIELDS } from '@/lib/fields'
 import {
   BarChart3,
@@ -19,9 +21,6 @@ import {
   Zap,
   UserCheck,
   UserX,
-  Phone,
-  Send,
-  Camera,
   Save,
   ShieldCheck,
   FileText,
@@ -51,13 +50,6 @@ type DBUser = {
   status: string
   field: string | null
   createdAt: string
-}
-
-type Settings = {
-  whatsapp: string
-  telegram: string
-  instagram: string
-  snapchat: string
 }
 
 type Convo = {
@@ -134,12 +126,6 @@ export function DashboardClient({ user }: { user: User }) {
   const [tab, setTab] = useState('Overview')
   const [users, setUsers] = useState<DBUser[]>([])
   const [loading, setLoading] = useState(true)
-  const [settings, setSettings] = useState<Settings>({
-    whatsapp: '',
-    telegram: '',
-    instagram: '',
-    snapchat: '',
-  })
   const [settingsLoading, setSettingsLoading] = useState(false)
   const [settingsSaved, setSettingsSaved] = useState(false)
   const [conversations, setConversations] = useState<Convo[]>([])
@@ -263,12 +249,6 @@ export function DashboardClient({ user }: { user: User }) {
         ])
         setUsers(Array.isArray(usersData) ? usersData : [])
         setIntake(Array.isArray(intakeData) ? intakeData : [])
-        setSettings({
-          whatsapp: settingsData.whatsapp || '',
-          telegram: settingsData.telegram || '',
-          instagram: settingsData.instagram || '',
-          snapchat: settingsData.snapchat || '',
-        })
         if (settingsData.commissionPercent !== undefined) setCommissionPercent(String(settingsData.commissionPercent))
       } catch (error) {
         console.error('Error fetching data:', error)
@@ -322,7 +302,7 @@ export function DashboardClient({ user }: { user: User }) {
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settings, commissionPercent: commissionPercent === '' ? undefined : Number(commissionPercent) }),
+        body: JSON.stringify({ commissionPercent: commissionPercent === '' ? undefined : Number(commissionPercent) }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -500,6 +480,7 @@ export function DashboardClient({ user }: { user: User }) {
           </div>
 
           <div className="mt-6"><PushPrompt /></div>
+        <RoleWatcher role={user.role} status={user.status} field={user.field} />
         {(isSuperAdmin || isSubAdmin) && <SupportPresence userId={String(user.id ?? user.email)} />}
 
           {/* Overview Tab */}
@@ -864,8 +845,8 @@ export function DashboardClient({ user }: { user: User }) {
               <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="font-bold">Connectors</h2>
-                    <p className="mt-1 text-xs text-slate-500">Configure social media & messaging channels.</p>
+                    <h2 className="font-bold">Commission</h2>
+                    <p className="mt-1 text-xs text-slate-500">Applies to every job price set when assigning.</p>
                   </div>
                   {settingsError && <span role="alert" className="text-xs text-rose-300">{settingsError}</span>}
                   {settingsSaved && (
@@ -875,57 +856,7 @@ export function DashboardClient({ user }: { user: User }) {
                   )}
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
-                      <Phone className="size-4" /> WhatsApp Number
-                    </label>
-                    <input
-                      value={settings.whatsapp}
-                      onChange={e => setSettings({ ...settings, whatsapp: e.target.value })}
-                      placeholder="233206478727"
-                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
-                      <Send className="size-4" /> Telegram Handle
-                    </label>
-                    <input
-                      value={settings.telegram}
-                      onChange={e => setSettings({ ...settings, telegram: e.target.value })}
-                      placeholder="@GeminiNexusAdmin"
-                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
-                      <Camera className="size-4" /> Instagram Handle
-                    </label>
-                    <input
-                      value={settings.instagram}
-                      onChange={e => setSettings({ ...settings, instagram: e.target.value })}
-                      placeholder="@GeminiNexusAdmin"
-                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
-                      <Zap className="size-4" /> Snapchat Username
-                    </label>
-                    <input
-                      value={settings.snapchat}
-                      onChange={e => setSettings({ ...settings, snapchat: e.target.value })}
-                      placeholder="GeminiNexus"
-                      className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-6 max-w-xs">
+                <div className="max-w-xs">
                   <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
                     <Percent className="size-4" /> Agent commission (% of job price)
                   </label>
@@ -956,12 +887,14 @@ export function DashboardClient({ user }: { user: User }) {
                 </button>
               </div>
 
+              <div className="xl:col-start-1"><ChatbotSettings /></div>
+
               {/* Info Card */}
-              <div className={`${glass} rounded-3xl p-5 h-fit`}>
+              <div className={`${glass} rounded-3xl p-5 h-fit xl:row-span-2`}>
                 <ShieldCheck className="size-6 text-emerald-400" />
                 <h3 className="mt-4 font-bold">Security</h3>
                 <p className="mt-2 text-xs leading-5 text-slate-500">
-                  All connectors are encrypted at rest. Only super admins can modify these settings.
+                  Only the super admin can change commission and chatbot settings. Clients reach you through Live Chat and the homepage assistant.
                 </p>
                 <div className="mt-4 pt-4 border-t border-white/10">
                   <p className="text-xs text-slate-500">Last updated</p>

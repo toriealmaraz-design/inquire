@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
 import { SupportPresence } from '@/components/support-presence'
+import { RoleWatcher } from '@/components/role-watcher'
 import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, Bell, BellOff } from 'lucide-react'
 
 type User = {
@@ -20,6 +21,7 @@ type Message = {
   id: number
   text: string
   sender: 'agent' | 'client'
+  bot?: boolean
   time: string
   read?: boolean
 }
@@ -51,7 +53,8 @@ function rowToMessage(r: DbMessage): Message {
   return {
     id: r.id,
     text: r.content,
-    sender: r.sender_type === 'agent' ? 'agent' : 'client',
+    sender: r.sender_type === 'client' ? 'client' : 'agent',
+    bot: r.sender_type === 'bot',
     time: fmtTime(r.created_at),
     read: r.read ?? false,
   }
@@ -302,6 +305,7 @@ export function AgentChatClient({ user }: { user: User }) {
 
         <PushPrompt compact />
         <SupportPresence userId={String(user.id)} />
+        <RoleWatcher role={user.role} field={user.field} />
 
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 && (
@@ -385,6 +389,7 @@ export function AgentChatClient({ user }: { user: User }) {
                         : 'bg-[#0f2847] text-slate-100 rounded-tl-none'
                     }`}
                   >
+                    {m.bot && <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80">Auto-reply</p>}
                     <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(maskFiles(m.text, isAdminUser))}</p>
                     <div className={`flex items-center gap-1 mt-1 ${m.sender === 'agent' ? 'justify-end' : ''}`}>
                       <span className="text-[10px] text-slate-400">{m.time}</span>

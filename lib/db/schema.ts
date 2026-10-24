@@ -24,6 +24,8 @@ export const settings = pgTable('settings', {
   telegramBotToken: text('telegram_bot_token').default(''),
   telegramChatId: varchar('telegram_chat_id', { length: 50 }).default(''),
   fileRetentionDays: integer('file_retention_days').notNull().default(7),
+  chatGreeting: text('chat_greeting'),
+  autoReplyEnabled: boolean('auto_reply_enabled').notNull().default(true),
   commissionPercent: numeric('commission_percent', { precision: 5, scale: 2 }).default('10'),
   vapidPublicKey: text('vapid_public_key'),
   vapidPrivateKey: text('vapid_private_key'),
@@ -124,3 +126,14 @@ export type Conversation = typeof conversations.$inferSelect
 export type Message = typeof messages.$inferSelect
 export type Upload = typeof uploads.$inferSelect
 export type Submission = typeof submissions.$inferSelect
+
+// Chatbot knowledge base: powers the homepage chatbot AND automatic replies in live chat
+export const chatbotReplies = pgTable('chatbot_replies', {
+  id: serial('id').primaryKey(),
+  question: varchar('question', { length: 120 }).notNull(),
+  keywords: text('keywords').notNull(),
+  reply: text('reply').notNull(),
+  sort: integer('sort').notNull().default(0),
+  enabled: boolean('enabled').notNull().default(true),
+  createdAt: timestamp('created_at').notNull().defaultNow(),
+})

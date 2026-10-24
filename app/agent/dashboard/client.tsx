@@ -7,6 +7,7 @@ import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
+import { RoleWatcher } from '@/components/role-watcher'
 
 type User = {
   id?: string
@@ -168,6 +169,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
           </div>
         </div>
 
+        <RoleWatcher role={user.role} field={user.field} />
         <div className="mt-6"><PushPrompt /></div>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>

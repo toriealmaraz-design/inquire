@@ -9,6 +9,7 @@ type Message = {
   id: number | string
   text: string
   sender: 'user' | 'agent'
+  bot?: boolean
   createdAt: string
   read?: boolean
   pending?: boolean
@@ -42,6 +43,7 @@ const rowToMessage = (r: DbMessage): Message => ({
   id: r.id,
   text: r.content,
   sender: r.sender_type === 'client' ? 'user' : 'agent',
+  bot: r.sender_type === 'bot',
   createdAt: r.created_at,
   read: r.read ?? false,
 })
@@ -202,7 +204,7 @@ export default function ChatPage() {
   const send = async (preset?: string) => {
     const text = (preset ?? input).trim()
     if (!text || sending) return
-    if (!supabase) return setError('Chat is not available right now. Please use WhatsApp from the homepage.')
+    if (!supabase) return setError('Chat is not available right now. Please submit a brief from the homepage instead.')
     setSending(true)
     setError('')
     if (!preset) setInput('')
@@ -313,10 +315,9 @@ export default function ChatPage() {
             <input
               value={contactDraft}
               onChange={(e) => setContactDraft(e.target.value)}
-              placeholder="WhatsApp / phone (optional)"
-              aria-label="WhatsApp or phone number"
-              inputMode="tel"
-              className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm outline-none focus:border-cyan-500/50"
+              placeholder="Phone or email (optional)"
+              aria-label="Phone number or email"
+                            className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm outline-none focus:border-cyan-500/50"
             />
             <button onClick={saveName} className="h-10 rounded-xl bg-cyan-500 px-4 text-sm font-bold text-slate-950 hover:bg-cyan-400">
               Save
@@ -365,7 +366,7 @@ export default function ChatPage() {
                         mine ? 'rounded-br-md bg-[#0c5f4a]' : 'rounded-bl-md bg-[#0f2847]'
                       } ${m.pending ? 'opacity-70' : ''}`}
                     >
-                      {!mine && <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">Gemini Nexus</p>}
+                      {!mine && <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">{m.bot ? 'Nexus Assistant · auto-reply' : 'Gemini Nexus'}</p>}
                       {file ? (
                         <a href={file.url} target="_blank" rel="noopener noreferrer" className="block">
                           {file.isImage && (
