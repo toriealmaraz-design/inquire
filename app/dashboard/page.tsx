@@ -37,7 +37,7 @@ export default async function DashboardPage() {
   }
 
   // Disabled users
-  if (status === 'disabled') {
+  if (status === 'disabled' || status === 'rejected') {
     return (
       <main className="min-h-screen flex items-center justify-center bg-[#06121d] px-5">
         <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">

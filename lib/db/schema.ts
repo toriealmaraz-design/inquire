@@ -23,6 +23,7 @@ export const settings = pgTable('settings', {
   snapchatUsername: varchar('snapchat_username', { length: 50 }).default('GeminiNexus'),
   telegramBotToken: text('telegram_bot_token').default(''),
   telegramChatId: varchar('telegram_chat_id', { length: 50 }).default(''),
+  fileRetentionDays: integer('file_retention_days').notNull().default(7),
   commissionPercent: numeric('commission_percent', { precision: 5, scale: 2 }).default('10'),
   vapidPublicKey: text('vapid_public_key'),
   vapidPrivateKey: text('vapid_private_key'),

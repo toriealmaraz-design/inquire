@@ -43,7 +43,13 @@ export async function PATCH(request: Request) {
 
   const updates: Record<string, unknown> = { updatedAt: new Date() }
 
-  if (typeof body?.status === 'string' && ['pending', 'active', 'disabled'].includes(body.status)) {
+  // pending -> active (approve) | rejected (reject); active -> disabled (removed / sacked)
+  if (typeof body?.status === 'string' && ['pending', 'active', 'disabled', 'rejected'].includes(body.status)) {
+    const [target] = await db.select({ role: users.role }).from(users).where(eq(users.id, id)).limit(1)
+    if (!target) return NextResponse.json({ error: 'User not found.' }, { status: 404 })
+    if (target.role === 'super_admin' && body.status !== 'active') {
+      return NextResponse.json({ error: 'The super admin account cannot be removed.' }, { status: 400 })
+    }
     updates.status = body.status
   }
 

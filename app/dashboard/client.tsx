@@ -325,6 +325,27 @@ export function DashboardClient({ user }: { user: User }) {
     }
   }
 
+  const confirmStatus = (u: DBUser, status: string, question: string) => {
+    if (window.confirm(question)) updateUser(u.id, { status })
+  }
+
+  // One group per client: briefs by contact, chat files by conversation
+  const briefGroups = Object.values(
+    intake.reduce<Record<string, { key: string; label: string; items: IntakeRow[] }>>((acc, s) => {
+      const key = (s.clientContact || '').trim().toLowerCase() || `ticket-${s.id}`
+      ;(acc[key] ||= { key, label: s.clientContact?.trim() || 'No contact given', items: [] }).items.push(s)
+      return acc
+    }, {})
+  )
+  const convoName = (id: number | null) => conversations.find((c) => c.id === id)?.clientName || 'Unknown client'
+  const fileGroups = Object.values(
+    uploads.reduce<Record<string, { key: string; label: string; items: UploadRow[] }>>((acc, f) => {
+      const key = String(f.conversation_id ?? 'none')
+      ;(acc[key] ||= { key, label: `${convoName(f.conversation_id)} · Chat #${f.conversation_id ?? '—'}`, items: [] }).items.push(f)
+      return acc
+    }, {})
+  )
+
   const pendingCount = users.filter(u => u.status === 'pending').length
   const activeCount = users.filter(u => u.status === 'active').length
 
@@ -574,28 +595,36 @@ export function DashboardClient({ user }: { user: User }) {
                               u.status === 'pending' ? 'bg-amber-500/20 text-amber-300' :
                               'bg-rose-500/20 text-rose-300'
                             }`}>
-                              {u.status}
+                              {u.status === 'disabled' ? 'removed' : u.status}
                             </span>
                           </td>
                           <td className="py-4">
                             <div className="flex gap-2">
                               {u.status === 'pending' && (
-                                <button
-                                  onClick={() => updateUser(u.id, { status: 'active' })}
-                                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
-                                >
-                                  <UserCheck className="size-3" /> Approve
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => updateUser(u.id, { status: 'active' })}
+                                    className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
+                                  >
+                                    <UserCheck className="size-3" /> Approve
+                                  </button>
+                                  <button
+                                    onClick={() => confirmStatus(u, 'rejected', `Reject ${u.name}'s request?`)}
+                                    className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/30"
+                                  >
+                                    <UserX className="size-3" /> Reject
+                                  </button>
+                                </>
                               )}
                               {u.status === 'active' && u.role !== 'super_admin' && (
                                 <button
-                                  onClick={() => updateUser(u.id, { status: 'disabled' })}
+                                  onClick={() => confirmStatus(u, 'disabled', `Remove ${u.name} from the team? They lose access immediately.`)}
                                   className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/30"
                                 >
-                                  <UserX className="size-3" /> Disable
+                                  <UserX className="size-3" /> Remove
                                 </button>
                               )}
-                              {u.status === 'disabled' && (
+                              {(u.status === 'disabled' || u.status === 'rejected') && (
                                 <button
                                   onClick={() => updateUser(u.id, { status: 'active' })}
                                   className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
@@ -618,13 +647,19 @@ export function DashboardClient({ user }: { user: User }) {
           {tab === 'Submissions' && (
             <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
               <h2 className="font-bold">Submissions &amp; Files</h2>
-              <p className="mt-1 text-xs text-slate-500">Briefs from the homepage intake form, then files shared in chat. Download files before they expire.</p>
+              <p className="mt-1 text-xs text-slate-500">Briefs from the homepage intake form, then files shared in chat. Grouped by client. Files are deleted automatically after 7 days to save space, so download them before then.</p>
               <h3 className="mt-6 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Intake briefs ({intake.length})</h3>
               {intake.length === 0 ? (
                 <p className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-500">No briefs yet. They appear here as soon as a client submits the homepage form.</p>
               ) : (
                 <div className="mt-3 flex flex-col gap-3">
-                  {intake.map((s) => (
+                  {briefGroups.map((g) => (
+                  <details key={g.key} open className="rounded-2xl border border-white/10 bg-black/10 p-3">
+                    <summary className="cursor-pointer select-none text-sm font-bold text-white">
+                      {g.label} <span className="ml-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-[11px] font-medium text-cyan-200">{g.items.length} brief{g.items.length === 1 ? '' : 's'}</span>
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-3">
+                  {g.items.map((s) => (
                     <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -676,6 +711,9 @@ export function DashboardClient({ user }: { user: User }) {
                       {payError[s.id] && <p role="alert" className="mt-2 text-xs text-rose-300">{payError[s.id]}</p>}
                     </div>
                   ))}
+                    </div>
+                  </details>
+                  ))}
                 </div>
               )}
               <h3 className="mt-8 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Chat files ({uploads.length})</h3>
@@ -686,7 +724,13 @@ export function DashboardClient({ user }: { user: User }) {
                 </div>
               ) : (
                 <div className="mt-6 flex flex-col gap-3">
-                  {uploads.map((f) => (
+                  {fileGroups.map((g) => (
+                  <details key={g.key} open className="rounded-2xl border border-white/10 bg-black/10 p-3">
+                    <summary className="cursor-pointer select-none text-sm font-bold text-white">
+                      {g.label} <span className="ml-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-[11px] font-medium text-cyan-200">{g.items.length} file{g.items.length === 1 ? '' : 's'}</span>
+                    </summary>
+                    <div className="mt-3 flex flex-col gap-3">
+                  {g.items.map((f) => (
                     <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300">
                         <FileText className="size-5" />
@@ -707,6 +751,9 @@ export function DashboardClient({ user }: { user: User }) {
                         <Download className="size-4" /> Download
                       </a>
                     </div>
+                  ))}
+                    </div>
+                  </details>
                   ))}
                 </div>
               )}
