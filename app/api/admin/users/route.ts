@@ -54,7 +54,7 @@ export async function PATCH(request: Request) {
   }
 
   if (body?.role !== undefined) {
-    const validRoles = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist', 'agent', null, '']
+    const validRoles = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist', 'admin', 'agent', null, '']
     if (validRoles.includes(body.role)) {
       updates.role = body.role || null
     }

@@ -8,7 +8,14 @@ import { users } from '@/lib/db/schema'
 const SUPER_ADMIN_EMAIL = process.env.SUPER_ADMIN_EMAIL
 
 // Helper to check roles
-export const ADMIN_ROLES = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist']
+// Leads: full field management (mark jobs paid, post announcements)
+export const LEAD_ROLES = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist']
+// 'admin' = basic admin (e.g. a promoted agent): chats with clients, sees briefs/files, assigns jobs
+export const ADMIN_ROLES = [...LEAD_ROLES, 'admin']
+
+export function isLead(role: string | null | undefined): boolean {
+  return role ? LEAD_ROLES.includes(role) : false
+}
 export const CHAT_ROLES = [...ADMIN_ROLES, 'agent']
 
 export function isAdmin(role: string | null | undefined): boolean {

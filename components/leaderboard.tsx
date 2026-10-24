@@ -20,12 +20,8 @@ type Entry = {
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 const MEDALS = ['text-amber-300', 'text-slate-200', 'text-orange-400']
 
-// Admin role that matches each field, used for "Promote"
-const PROMOTE_ROLE: Record<string, { role: string; label: string }> = {
-  academic: { role: 'academic_lead', label: 'Academic Lead' },
-  systems: { role: 'it_graphics_lead', label: 'IT Lead' },
-  media: { role: 'field_specialist', label: 'Field Specialist' },
-}
+// Promotion gives the basic admin role (fewer privileges than field leads)
+const PROMOTED = { role: 'admin', label: 'Admin' }
 
 export function Leaderboard({ compact = false }: { compact?: boolean }) {
   const [period, setPeriod] = useState<'month' | 'all'>('month')
@@ -50,8 +46,8 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
   useEffect(() => load(period), [period])
 
   const promote = async (e: Entry) => {
-    const target = PROMOTE_ROLE[e.field || ''] || PROMOTE_ROLE.academic
-    if (!window.confirm(`Promote ${e.name} to ${target.label}? They'll get admin access.`)) return
+    const target = PROMOTED
+    if (!window.confirm(`Promote ${e.name} to ${target.label}? They'll be able to chat with clients, see briefs and files, and assign jobs.`)) return
     setBusy(e.id)
     setNotice('')
     const res = await fetch('/api/admin/users', {

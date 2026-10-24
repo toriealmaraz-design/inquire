@@ -126,7 +126,8 @@ const ROLES = [
   { value: 'academic_lead', label: 'Academic Lead' },
   { value: 'it_graphics_lead', label: 'IT/Graphics Lead' },
   { value: 'field_specialist', label: 'Field Specialist' },
-  { value: 'agent', label: 'Agent (Chat Only)' },
+  { value: 'admin', label: 'Admin (basic)' },
+  { value: 'agent', label: 'Agent' },
 ]
 
 export function DashboardClient({ user }: { user: User }) {
@@ -241,7 +242,8 @@ export function DashboardClient({ user }: { user: User }) {
   }
 
   const isSuperAdmin = user.role === 'super_admin'
-  const isSubAdmin = ['academic_lead', 'it_graphics_lead', 'field_specialist'].includes(user.role || '')
+  const isLeadUser = ['academic_lead', 'it_graphics_lead', 'field_specialist'].includes(user.role || '')
+  const isSubAdmin = isLeadUser || user.role === 'admin'
   
   // Navigation based on role
   const nav = isSuperAdmin
@@ -498,7 +500,7 @@ export function DashboardClient({ user }: { user: User }) {
           </div>
 
           <div className="mt-6"><PushPrompt /></div>
-        {['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist'].includes(user.role || '') && <SupportPresence userId={String(user.id ?? user.email)} />}
+        {(isSuperAdmin || isSubAdmin) && <SupportPresence userId={String(user.id ?? user.email)} />}
 
           {/* Overview Tab */}
           {tab === 'Overview' && (
@@ -736,7 +738,7 @@ export function DashboardClient({ user }: { user: User }) {
                             >
                               {s.assignedTo ? 'Update' : 'Assign'}
                             </button>
-                            {s.assignedTo && (
+                            {s.assignedTo && (isSuperAdmin || isLeadUser) && (
                               <button
                                 onClick={() => window.confirm(`Mark ${s.ticketId} as paid? Commission becomes earned and the job is locked.`) && updateBrief(s.id, { action: 'paid' })}
                                 disabled={payingId === s.id}

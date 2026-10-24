@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
-import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin } from '@/lib/auth'
+import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin, isLead } from '@/lib/auth'
 import { fieldLabel } from '@/lib/fields'
 import { sendPush } from '@/lib/push'
 
@@ -192,6 +192,9 @@ export async function PATCH(request: Request) {
     }
 
     if (body?.action === 'paid') {
+      if (!isLead(user.role)) {
+        return NextResponse.json({ error: 'Only leads and the super admin can mark jobs paid.' }, { status: 403 })
+      }
       if (!existing.assignedTo || !existing.priceGhs) {
         return NextResponse.json({ error: 'Assign the job to an agent with a price first.' }, { status: 400 })
       }

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { desc, eq, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { announcements, users } from '@/lib/db/schema'
-import { getStaffUser, isAdmin } from '@/lib/auth'
+import { getStaffUser, isLead } from '@/lib/auth'
 import { fieldLabel, isField } from '@/lib/fields'
 import { sendPush } from '@/lib/push'
 
@@ -41,8 +41,8 @@ export async function GET() {
 // Super admin: everyone or one field. Field admins: their own field only.
 export async function POST(request: Request) {
   const user = await getStaffUser()
-  if (!user || !isAdmin(user.role)) {
-    return NextResponse.json({ error: 'Only admins can post announcements.' }, { status: 403 })
+  if (!user || !isLead(user.role)) {
+    return NextResponse.json({ error: 'Only leads and the super admin can post announcements.' }, { status: 403 })
   }
 
   const body = await request.json().catch(() => null)

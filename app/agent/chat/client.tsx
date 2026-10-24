@@ -58,7 +58,7 @@ function rowToMessage(r: DbMessage): Message {
 }
 
 // Agents never see client files; admins do
-const ADMIN_ROLE_LIST = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist']
+const ADMIN_ROLE_LIST = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist', 'admin']
 function maskFiles(text: string, admin: boolean) {
   return !admin && text.startsWith('📎') ? '📎 A file was shared (visible to admins only)' : text
 }
