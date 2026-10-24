@@ -26,6 +26,7 @@ import {
   FileText,
   Bell,
   Download,
+  ChevronDown,
   Megaphone,
   Trophy,
   Percent,
@@ -137,6 +138,8 @@ export function DashboardClient({ user }: { user: User }) {
   const [payingId, setPayingId] = useState<number | null>(null)
   const [staff, setStaff] = useState<{ id: number; name: string; role: string | null; field: string | null }[]>([])
   const [agentDraft, setAgentDraft] = useState<Record<number, string>>({})
+  const [subSearch, setSubSearch] = useState('')
+  const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
   const [notifEnabled, setNotifEnabled] = useState(false)
@@ -322,22 +325,58 @@ export function DashboardClient({ user }: { user: User }) {
     if (window.confirm(question)) updateUser(u.id, { status })
   }
 
-  // One group per client: briefs by contact, chat files by conversation
-  const briefGroups = Object.values(
-    intake.reduce<Record<string, { key: string; label: string; items: IntakeRow[] }>>((acc, s) => {
-      const key = (s.clientContact || '').trim().toLowerCase() || `ticket-${s.id}`
-      ;(acc[key] ||= { key, label: s.clientContact?.trim() || 'No contact given', items: [] }).items.push(s)
-      return acc
-    }, {})
-  )
-  const convoName = (id: number | null) => conversations.find((c) => c.id === id)?.clientName || 'Unknown client'
-  const fileGroups = Object.values(
-    uploads.reduce<Record<string, { key: string; label: string; items: UploadRow[] }>>((acc, f) => {
-      const key = String(f.conversation_id ?? 'none')
-      ;(acc[key] ||= { key, label: `${convoName(f.conversation_id)} · Chat #${f.conversation_id ?? '—'}`, items: [] }).items.push(f)
-      return acc
-    }, {})
-  )
+  // ---- Client folders: every brief + chat file for one client, together ----
+  // Contacts are normalised so "024 000 0000", "+233 24 000 0000" and "@Handle" match their variants.
+  const clientKey = (raw: string | null | undefined) => {
+    const v = (raw || '').trim().toLowerCase()
+    if (!v) return ''
+    const digits = v.replace(/\D/g, '')
+    return digits.length >= 9 && digits.length >= v.replace(/[\s+()-]/g, '').length - 1 ? `tel:${digits.slice(-9)}` : v.replace(/^@/, '')
+  }
+  type ClientFolder = { key: string; name: string; contact: string; briefs: IntakeRow[]; files: UploadRow[]; last: number }
+  const folders = (() => {
+    const map = new Map<string, ClientFolder>()
+    const get = (key: string, name: string, contact: string) => {
+      let f = map.get(key)
+      if (!f) map.set(key, (f = { key, name, contact, briefs: [], files: [], last: 0 }))
+      if (!f.name && name) f.name = name
+      return f
+    }
+    for (const s of intake) {
+      const key = clientKey(s.clientContact) || `ticket-${s.id}`
+      const f = get(key, '', s.clientContact?.trim() || '')
+      f.briefs.push(s)
+      f.last = Math.max(f.last, s.createdAt ? Date.parse(s.createdAt) : 0)
+    }
+    for (const u of uploads) {
+      const convo = conversations.find((c) => c.id === u.conversation_id)
+      const label = convo?.clientName || `Chat #${u.conversation_id ?? '—'}`
+      const m = label.match(/^(.*?)\s*\(([^)]+)\)\s*$/) // "Name (contact)" from the chat page
+      const name = (m ? m[1] : label).trim()
+      const contact = m ? m[2].trim() : ''
+      const key = clientKey(contact) || `chat-${u.conversation_id ?? 'none'}`
+      const f = get(key, name, contact)
+      f.files.push(u)
+      f.last = Math.max(f.last, Date.parse(u.created_at))
+    }
+    return [...map.values()].sort((a, b) => b.last - a.last)
+  })()
+  const visibleFolders = folders
+    .map((f) => ({
+      ...f,
+      briefs: f.briefs.filter((s) =>
+        subFilter === 'open' ? !s.assignedTo && !s.paidAt : subFilter === 'assigned' ? !!s.assignedTo && !s.paidAt : subFilter === 'paid' ? !!s.paidAt : true
+      ),
+    }))
+    .filter((f) => (subFilter === 'all' || f.briefs.length > 0))
+    .filter((f) => {
+      const q = subSearch.trim().toLowerCase()
+      if (!q) return true
+      return [f.name, f.contact, ...f.briefs.map((s) => `${s.ticketId} ${s.serviceType} ${s.briefDetails || ''}`), ...f.files.map((x) => x.file_name)]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    })
 
   const pendingCount = users.filter(u => u.status === 'pending').length
   const activeCount = users.filter(u => u.status === 'active').length
@@ -641,21 +680,79 @@ export function DashboardClient({ user }: { user: User }) {
 
           {/* Submissions Tab */}
           {tab === 'Submissions' && (
-            <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
-              <h2 className="font-bold">Submissions &amp; Files</h2>
-              <p className="mt-1 text-xs text-slate-500">Briefs from the homepage intake form, then files shared in chat. Grouped by client. Files are deleted automatically after 7 days to save space, so download them before then.</p>
-              <h3 className="mt-6 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Intake briefs ({intake.length})</h3>
-              {intake.length === 0 ? (
-                <p className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-500">No briefs yet. They appear here as soon as a client submits the homepage form.</p>
+            <div className="mt-8 flex flex-col gap-4">
+              <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
+                <div className="flex flex-wrap items-end justify-between gap-4">
+                  <div>
+                    <h2 className="font-bold">Clients &amp; assignments</h2>
+                    <p className="mt-1 text-xs text-slate-500">
+                      One folder per client with all their briefs and files. Files are deleted automatically after 7 days, so download them before then.
+                    </p>
+                  </div>
+                  <div className="flex gap-2 text-center text-[11px] text-slate-400">
+                    {[
+                      ['Clients', folders.length],
+                      ['Open', intake.filter((s) => !s.assignedTo && !s.paidAt).length],
+                      ['Assigned', intake.filter((s) => s.assignedTo && !s.paidAt).length],
+                      ['Paid', intake.filter((s) => s.paidAt).length],
+                    ].map(([label, n]) => (
+                      <span key={label as string} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2"><strong className="block text-base text-white">{n}</strong>{label}</span>
+                    ))}
+                  </div>
+                </div>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    value={subSearch}
+                    onChange={(e) => setSubSearch(e.target.value)}
+                    placeholder="Search client, contact, ticket, file…"
+                    aria-label="Search clients"
+                    className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
+                  />
+                  <div className="flex rounded-xl bg-white/5 p-1 text-xs">
+                    {(['all', 'open', 'assigned', 'paid'] as const).map((f) => (
+                      <button key={f} onClick={() => setSubFilter(f)} className={`rounded-lg px-3 py-1.5 capitalize ${subFilter === f ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                        {f}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {visibleFolders.length === 0 ? (
+                <div className={`${glass} rounded-3xl p-10 text-center text-sm text-slate-500`}>
+                  <FileText className="mx-auto mb-3 size-10 opacity-50" />
+                  {folders.length === 0 ? 'No clients yet. Briefs and chat files appear here automatically.' : 'Nothing matches this filter.'}
+                </div>
               ) : (
-                <div className="mt-3 flex flex-col gap-3">
-                  {briefGroups.map((g) => (
-                  <details key={g.key} open className="rounded-2xl border border-white/10 bg-black/10 p-3">
-                    <summary className="cursor-pointer select-none text-sm font-bold text-white">
-                      {g.label} <span className="ml-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-[11px] font-medium text-cyan-200">{g.items.length} brief{g.items.length === 1 ? '' : 's'}</span>
-                    </summary>
-                    <div className="mt-3 flex flex-col gap-3">
-                  {g.items.map((s) => (
+                visibleFolders.map((g) => {
+                  const openJobs = g.briefs.filter((s) => !s.paidAt).length
+                  const value = g.briefs.reduce((t, s) => t + Number(s.priceGhs || 0), 0)
+                  const title = g.name || g.contact || 'Unnamed client'
+                  return (
+                    <details key={g.key} open={openJobs > 0 || !!subSearch} className={`${glass} group rounded-3xl`}>
+                      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-3 p-4 sm:p-5">
+                        <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/30 to-indigo-500/30 text-sm font-bold text-cyan-100">
+                          {title.replace(/^[^a-z0-9]+/i, '').charAt(0).toUpperCase() || '?'}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-white">{title}</p>
+                          <p className="truncate text-xs text-slate-400">{g.contact && g.contact !== title ? g.contact : g.name ? '' : 'No contact given'}</p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 text-[11px]">
+                          <span className="rounded-full bg-cyan-300/10 px-2 py-0.5 text-cyan-200">{g.briefs.length} brief{g.briefs.length === 1 ? '' : 's'}</span>
+                          <span className="rounded-full bg-violet-300/10 px-2 py-0.5 text-violet-200">{g.files.length} file{g.files.length === 1 ? '' : 's'}</span>
+                          {openJobs > 0 && <span className="rounded-full bg-amber-300/10 px-2 py-0.5 text-amber-200">{openJobs} active</span>}
+                          {value > 0 && <span className="rounded-full bg-emerald-300/10 px-2 py-0.5 text-emerald-200">GHS {value.toFixed(0)}</span>}
+                        </div>
+                        <ChevronDown className="size-4 text-slate-500 transition group-open:rotate-180" />
+                      </summary>
+
+                      <div className="flex flex-col gap-4 border-t border-white/10 p-4 sm:p-5">
+                        {g.briefs.length > 0 && (
+                          <div>
+                            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.16em] text-slate-500">Briefs</p>
+                            <div className="flex flex-col gap-3">
+                              {g.briefs.map((s) => (
                     <div key={s.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -665,9 +762,9 @@ export function DashboardClient({ user }: { user: User }) {
                         <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">
-                        {[s.scope, s.urgency, s.clientContact ? `Contact: ${s.clientContact}` : null, s.createdAt ? fmtTime(s.createdAt) : null].filter(Boolean).join(' · ')}
+                        {[s.scope, s.urgency, s.createdAt ? fmtTime(s.createdAt) : null].filter(Boolean).join(' · ')}
                       </p>
-                      {s.briefDetails && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{s.briefDetails}</p>}
+                      {s.briefDetails && <details className="mt-2 text-sm text-slate-300"><summary className="cursor-pointer select-none text-xs text-cyan-300 hover:text-cyan-200">Read brief</summary><p className="mt-2 whitespace-pre-wrap leading-6">{s.briefDetails}</p></details>}
                       {s.fileUrls && /^https?:\/\//.test(s.fileUrls) && (
                         <a href={s.fileUrls} target="_blank" rel="noopener noreferrer" download className="mt-3 inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500">
                           <Download className="size-4" /> Download attachment
@@ -733,27 +830,15 @@ export function DashboardClient({ user }: { user: User }) {
                       </div>
                       {payError[s.id] && <p role="alert" className="mt-2 text-xs text-rose-300">{payError[s.id]}</p>}
                     </div>
-                  ))}
-                    </div>
-                  </details>
-                  ))}
-                </div>
-              )}
-              <h3 className="mt-8 text-xs font-bold uppercase tracking-[.16em] text-slate-400">Chat files ({uploads.length})</h3>
-              {uploads.length === 0 ? (
-                <div className="mt-6 text-center py-12 text-slate-500">
-                  <FileText className="size-12 mx-auto mb-4 opacity-50" />
-                  <p>No submissions yet</p>
-                </div>
-              ) : (
-                <div className="mt-6 flex flex-col gap-3">
-                  {fileGroups.map((g) => (
-                  <details key={g.key} open className="rounded-2xl border border-white/10 bg-black/10 p-3">
-                    <summary className="cursor-pointer select-none text-sm font-bold text-white">
-                      {g.label} <span className="ml-1 rounded-full bg-cyan-300/10 px-2 py-0.5 text-[11px] font-medium text-cyan-200">{g.items.length} file{g.items.length === 1 ? '' : 's'}</span>
-                    </summary>
-                    <div className="mt-3 flex flex-col gap-3">
-                  {g.items.map((f) => (
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {g.files.length > 0 && (
+                          <div>
+                            <p className="mb-2 text-[11px] font-bold uppercase tracking-[.16em] text-slate-500">Chat files</p>
+                            <div className="flex flex-col gap-2">
+                              {g.files.map((f) => (
                     <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
                       <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300">
                         <FileText className="size-5" />
@@ -761,7 +846,7 @@ export function DashboardClient({ user }: { user: User }) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-white">{f.file_name}</p>
                         <p className="text-[11px] text-slate-500">
-                          {f.uploaded_by === 'client' ? 'Client' : 'Agent'} · Convo #{f.conversation_id ?? '—'} · {fmtSize(f.file_size)} · {fmtTime(f.created_at)}
+                          {f.uploaded_by === 'client' ? 'From client' : 'From staff'} · {fmtSize(f.file_size)} · {fmtTime(f.created_at)}
                         </p>
                       </div>
                       <a
@@ -774,11 +859,14 @@ export function DashboardClient({ user }: { user: User }) {
                         <Download className="size-4" /> Download
                       </a>
                     </div>
-                  ))}
-                    </div>
-                  </details>
-                  ))}
-                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )
+                })
               )}
             </div>
           )}

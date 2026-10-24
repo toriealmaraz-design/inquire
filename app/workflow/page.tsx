@@ -1,26 +1,122 @@
-import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Coins, LockKeyhole, Palette, Send, ShieldCheck, Users, Wrench } from 'lucide-react'
+import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Coins, KeyRound, LockKeyhole, MessageCircle, Palette, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react'
+
+const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
+const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 
 const stages = [
-  { number: '01', title: 'Client submits a request', description: 'A client sends an assignment brief, scope, urgency, and preferred contact channel.', icon: ClipboardList, tone: 'bg-indigo-50 text-indigo-700' },
-  { number: '02', title: 'Secure intake line', description: 'Every request enters one controlled, confidential intake channel for consistent handling.', icon: LockKeyhole, tone: 'bg-slate-100 text-slate-700' },
-  { number: '03', title: 'Intake contact logs it', description: 'The intake contact person confirms the brief and records the request for operations.', icon: ShieldCheck, tone: 'bg-emerald-50 text-emerald-700' },
-  { number: '04', title: 'Higher-ups are notified', description: 'Operations receives the new request and reviews the requirements, timing, and fit.', icon: Send, tone: 'bg-amber-50 text-amber-700' },
-  { number: '05', title: 'Work is allocated', description: 'The right specialist or project team is assigned based on the assignment type.', icon: Users, tone: 'bg-violet-50 text-violet-700' },
-  { number: '06', title: 'Work is completed', description: 'Assigned personnel execute the work with oversight where the project requires it.', icon: CheckCircle2, tone: 'bg-cyan-50 text-cyan-700' },
-  { number: '07', title: 'Delivery and payout', description: 'The finished work is delivered to the client, then contributors are paid for their completed work.', icon: Coins, tone: 'bg-rose-50 text-rose-700' },
+  { title: 'You send a brief', description: 'Submit the intake form or start a Live Chat. Add the scope, deadline and any files (up to 50 MB).', icon: ClipboardList, tone: 'from-cyan-400/20 to-blue-500/10 text-cyan-200' },
+  { title: 'It lands on one secure line', description: 'Every request gets a ticket number (like GN-1042) and goes into one private queue. Only our admins see your details and files.', icon: LockKeyhole, tone: 'from-indigo-400/20 to-violet-500/10 text-indigo-200' },
+  { title: 'An admin reviews and quotes', description: 'The admin for your field checks the requirements and sends a custom GHS quote in Live Chat. No deposit is needed to get a quote.', icon: MessageCircle, tone: 'from-emerald-400/20 to-teal-500/10 text-emerald-200' },
+  { title: 'The right specialist is assigned', description: 'Once you agree, the job is given to a vetted specialist in that field. They see the brief, never your contact details.', icon: Users, tone: 'from-violet-400/20 to-fuchsia-500/10 text-violet-200' },
+  { title: 'Work is done with oversight', description: 'Your admin tracks progress and keeps you updated in Live Chat. Send your ticket number any time to check its status.', icon: CheckCircle2, tone: 'from-amber-300/20 to-orange-500/10 text-amber-200' },
+  { title: 'Delivery and payment', description: 'The finished work is delivered to you, payment is confirmed, and the job is closed. Uploaded files are deleted after 7 days.', icon: Coins, tone: 'from-rose-400/20 to-pink-500/10 text-rose-200' },
 ]
 
 const routing = [
-  { title: 'Reading & writing', owner: 'Seraphim and team', description: 'Research, essays, reports, literature reviews, editing, and structured writing.', icon: BookOpen },
-  { title: 'Hands-on work', owner: 'Caleb and team', description: 'Graphic design, IT support, software, systems, and other practical deliverables.', icon: Wrench },
-  { title: 'Project work', owner: 'Higher-ups oversee', description: 'Larger engagements are coordinated jointly and delivered by the relevant personnel.', icon: Palette },
+  { title: 'Academic & Research', owner: 'Academic team', description: 'Essays, case studies, reports, literature reviews, editing and structured writing.', icon: BookOpen },
+  { title: 'Presentations & Visuals', owner: 'Media team', description: 'Defense decks, infographics, graphic design and visual media.', icon: Palette },
+  { title: 'Software, IT & Hands-on', owner: 'IT team', description: 'Coding, websites, databases, systems and other technical deliverables.', icon: Wrench },
 ]
 
 export default function WorkflowPage() {
-  return <main className="min-h-screen bg-slate-50 text-slate-900">
-    <header className="border-b border-slate-200 bg-white"><div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 lg:px-8"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-indigo-600">Gemini Nexus operations</p><h1 className="mt-2 text-xl font-bold tracking-tight">Assignment workflow roadmap</h1></div><a href="/" className="inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold hover:border-indigo-300 hover:text-indigo-600">Request assistance <ArrowRight className="size-4" /></a></div></header>
-    <section className="border-b border-slate-200 bg-white"><div className="mx-auto max-w-6xl px-5 py-14 lg:px-8"><div className="max-w-3xl"><span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-bold text-indigo-700"><ShieldCheck className="size-3.5" /> One secure line from intake to delivery</span><h2 className="mt-5 text-4xl font-bold tracking-[-.05em] text-slate-950 sm:text-6xl">A clear path for every assignment.</h2><p className="mt-5 max-w-2xl text-base leading-7 text-slate-500">Every request is received, routed to the right people, completed with care, and delivered through a single accountable workflow.</p></div></div></section>
-    <section className="mx-auto max-w-6xl px-5 py-12 lg:px-8"><div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">{stages.map(({ number, title, description, icon: Icon, tone }) => <article key={number} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><div className="flex items-start justify-between"><span className={`flex size-11 items-center justify-center rounded-xl ${tone}`}><Icon className="size-5" /></span><span className="text-xs font-bold tracking-[.16em] text-slate-300">{number}</span></div><h3 className="mt-5 text-base font-bold">{title}</h3><p className="mt-2 text-sm leading-6 text-slate-500">{description}</p></article>)}</div></section>
-    <section className="mx-auto max-w-6xl px-5 pb-16 lg:px-8"><div className="rounded-3xl border border-slate-200 bg-slate-950 p-6 text-white sm:p-8"><div className="max-w-2xl"><p className="text-xs font-bold uppercase tracking-[.16em] text-indigo-300">Specialist routing</p><h2 className="mt-3 text-2xl font-bold tracking-tight">The right team for the right kind of work.</h2><p className="mt-3 text-sm leading-6 text-slate-300">Higher-ups allocate requests according to assignment type, capacity, and the specialist skills required.</p></div><div className="mt-8 grid gap-4 lg:grid-cols-3">{routing.map(({ title, owner, description, icon: Icon }) => <article key={title} className="rounded-2xl border border-white/10 bg-white/5 p-5"><Icon className="size-5 text-indigo-300" /><p className="mt-5 text-sm font-bold">{title}</p><p className="mt-1 text-xs font-semibold text-indigo-200">{owner}</p><p className="mt-3 text-sm leading-6 text-slate-300">{description}</p></article>)}</div></div></section>
-  </main>
+  return (
+    <main className="min-h-screen overflow-x-hidden bg-[#06121d] text-slate-100 selection:bg-cyan-300 selection:text-slate-950">
+      <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
+        <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
+        <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
+        <div className="absolute bottom-0 left-1/2 size-80 rounded-full bg-violet-500/10 blur-[130px]" />
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
+          <a href="/" className="flex items-center gap-3">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={logoUrl} alt="Gemini Nexus" width={40} height={40} className="size-10 rounded-xl object-cover" />
+            <span>
+              <strong className="block text-sm tracking-tight">Gemini Nexus</strong>
+              <small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small>
+            </span>
+          </a>
+          <nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
+            <a href="/" className="hover:text-white">Intake portal</a>
+            <a href="/workflow" aria-current="page" className="text-white">How it works</a>
+            <a href="/chat" className="hover:text-white">Live chat</a>
+          </nav>
+          <a href="/auth/signin" aria-label="Staff sign in" title="Staff sign in" className="rounded-xl border border-white/10 p-2 text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-300">
+            <KeyRound className="size-4" />
+          </a>
+        </div>
+      </header>
+
+      <section className="relative mx-auto max-w-7xl px-5 pb-12 pt-16 lg:px-8 lg:pt-24">
+        <div className="max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200">
+            <ShieldCheck className="size-3.5" /> One secure line from brief to delivery
+          </span>
+          <h1 className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-6xl">
+            How it works.
+            <br />
+            <span className="bg-gradient-to-r from-cyan-200 via-white to-indigo-300 bg-clip-text text-transparent">Clear at every step.</span>
+          </h1>
+          <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">
+            Every request is received, quoted, routed to the right specialist, completed with oversight and delivered, all through one accountable workflow.
+          </p>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <ol className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+          {stages.map(({ title, description, icon: Icon, tone }, i) => (
+            <li key={title} className={`${glass} rounded-3xl p-6 transition hover:-translate-y-0.5`}>
+              <div className="flex items-start justify-between">
+                <span className={`flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br ${tone}`}>
+                  <Icon className="size-5" />
+                </span>
+                <span className="text-xs font-bold tracking-[.16em] text-slate-600">{String(i + 1).padStart(2, '0')}</span>
+              </div>
+              <h2 className="mt-5 text-base font-bold text-white">{title}</h2>
+              <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-5 pb-16 lg:px-8">
+        <div className={`${glass} rounded-[2rem] p-6 sm:p-8`}>
+          <div className="max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Specialist routing</p>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">The right team for the right kind of work.</h2>
+            <p className="mt-3 text-sm leading-6 text-slate-400">Admins route each request by its service track, the skills it needs and who is available.</p>
+          </div>
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {routing.map(({ title, owner, description, icon: Icon }) => (
+              <article key={title} className="rounded-2xl border border-white/10 bg-black/15 p-5">
+                <span className="flex size-10 items-center justify-center rounded-xl bg-white/10 text-cyan-300"><Icon className="size-5" /></span>
+                <p className="mt-5 text-sm font-bold text-white">{title}</p>
+                <p className="mt-1 text-xs font-semibold text-cyan-200">{owner}</p>
+                <p className="mt-3 text-sm leading-6 text-slate-400">{description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-5 pb-24 lg:px-8">
+        <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-indigo-500/10 p-6 sm:flex-row sm:items-center sm:p-8">
+          <div>
+            <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-cyan-300"><Sparkles className="size-3.5" /> Ready when you are</p>
+            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">Get a custom GHS quote. No deposit.</h2>
+          </div>
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <a href="/#intake" className="flex items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-200">
+              Start a brief <ArrowRight className="size-4" />
+            </a>
+            <a href="/chat" className="flex items-center justify-center gap-2 rounded-xl border border-white/15 px-5 py-3 text-sm font-semibold hover:border-cyan-300/50">
+              <MessageCircle className="size-4" /> Live chat
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+  )
 }
