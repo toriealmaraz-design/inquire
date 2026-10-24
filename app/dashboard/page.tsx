@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getUser, isAdmin } from '@/lib/auth'
+import { getPageUser, isAdmin } from '@/lib/auth'
 import { DashboardClient } from './client'
 import { SignOutButton } from './signout-button'
 
@@ -7,7 +7,7 @@ import { SignOutButton } from './signout-button'
 export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
-  const user = await getUser()
+  const user = await getPageUser()
 
   if (!user) {
     redirect('/auth/signin')

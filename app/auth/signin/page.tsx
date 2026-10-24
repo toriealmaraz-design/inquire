@@ -7,15 +7,33 @@ import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 
 const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
 
+const ERROR_MESSAGES: Record<string, string> = {
+  account_lookup_failed: "You're signed in with Google, but we couldn't load your account. The server can't reach the database right now. Please try again in a minute.",
+  callback_error: 'Sign-in could not be completed. Please try again.',
+  pkce_mismatch: 'Sign-in was started in a different browser or tab. Please click "Continue with Google" again here.',
+  missing_code: 'Sign-in was interrupted. Please try again.',
+  access_denied: 'Google sign-in was cancelled.',
+}
+
+function friendlyError(code: string | null) {
+  if (!code) return ''
+  return ERROR_MESSAGES[code] || code
+}
+
+// Only allow redirects within this site
+function safePath(value: string | null) {
+  return value && value.startsWith('/') && !value.startsWith('//') ? value : '/dashboard'
+}
+
 function AuthContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const redirectTo = searchParams.get('redirectTo') || '/dashboard'
+  const redirectTo = safePath(searchParams.get('redirectTo'))
   const initialError = searchParams.get('error')
   
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(initialError || '')
+  const [error, setError] = useState(friendlyError(initialError))
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   
@@ -62,7 +80,9 @@ function AuthContent() {
       setError(error.message)
       setLoading(false)
     } else {
-      router.push(redirectTo)
+      // Full reload so the server sees the new session cookie
+      router.refresh()
+      window.location.assign(redirectTo)
     }
   }
 
@@ -96,9 +116,30 @@ function AuthContent() {
       setError(error.message)
       setLoading(false)
     } else {
-      setSuccess('Check your email to confirm your account!')
+      setSuccess('Check your email and click the link to confirm your account.')
       setLoading(false)
     }
+  }
+
+  const sendSignInLink = async () => {
+    if (!email) {
+      setError('Enter your email address first, then click "Email me a sign-in link".')
+      return
+    }
+    setLoading(true)
+    setError('')
+    setSuccess('')
+    const supabase = createClient()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+      },
+    })
+    setLoading(false)
+    if (error) setError(error.message)
+    else setSuccess(`We sent a sign-in link to ${email}. Open it on this device.`)
   }
 
   return (
@@ -150,7 +191,7 @@ function AuthContent() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 px-4 py-3 text-sm text-rose-300">
+          <div role="alert" className="mt-4 rounded-xl bg-rose-500/10 border border-rose-500/20 px-4 py-3 text-sm text-rose-300">
             {error}
           </div>
         )}
@@ -201,6 +242,7 @@ function AuthContent() {
             <Mail className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-500" />
             <input
               type="email"
+              autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="Email address"
@@ -212,6 +254,7 @@ function AuthContent() {
             <Lock className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-500" />
             <input
               type={showPassword ? 'text' : 'password'}
+              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
@@ -220,6 +263,7 @@ function AuthContent() {
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
               className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white transition"
             >
               {showPassword ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
@@ -228,9 +272,9 @@ function AuthContent() {
 
           {mode === 'signin' && (
             <div className="flex justify-end">
-              <a href="/auth/reset-password" className="text-xs text-cyan-400 hover:underline">
-                Forgot password?
-              </a>
+              <button type="button" onClick={sendSignInLink} disabled={loading} className="text-xs text-cyan-400 hover:underline disabled:opacity-50">
+                Forgot password? Email me a sign-in link
+              </button>
             </div>
           )}
 
@@ -253,7 +297,7 @@ function AuthContent() {
         {/* Footer */}
         <p className="mt-6 text-center text-xs text-slate-500">
           {mode === 'signin' ? (
-            <>New accounts require admin approval.</>
+            <>Staff accounts only. Clients don&apos;t need to sign in.</>
           ) : (
             <>By signing up, you agree to our terms of service.</>
           )}
