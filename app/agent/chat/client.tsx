@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PushPrompt } from '@/components/push-prompt'
 import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, Bell, BellOff } from 'lucide-react'
 
 type User = {
@@ -11,6 +12,7 @@ type User = {
   email?: string | null
   image?: string | null
   role?: string | null
+  field?: string | null
 }
 
 type Message = {
@@ -289,6 +291,8 @@ export function AgentChatClient({ user }: { user: User }) {
             </button>
           </div>
         </div>
+
+        <PushPrompt compact />
 
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 && (

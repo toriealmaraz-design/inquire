@@ -3,7 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { MessageCircle, LogOut, FileText, Bell, Download, Zap } from 'lucide-react'
+import { MessageCircle, LogOut, FileText, Bell, Download, Zap, Copy, Check, Wallet } from 'lucide-react'
+import { PushPrompt } from '@/components/push-prompt'
+import { Announcements } from '@/components/announcements'
 
 type User = {
   id?: string
@@ -11,6 +13,7 @@ type User = {
   email?: string | null
   image?: string | null
   role?: string | null
+  field?: string | null
 }
 
 type UploadRow = {
@@ -21,6 +24,15 @@ type UploadRow = {
   file_size: number | null
   uploaded_by: string
   created_at: string
+}
+
+type Earnings = {
+  referralCode: string
+  commissionPercent: number
+  referred: number
+  paidCount: number
+  totalEarned: number
+  items: { id: number; ticketId: string; serviceType: string; status: string | null; commissionGhs: string | null; paidAt: string | null; createdAt: string | null }[]
 }
 
 type DbMsg = {
@@ -50,6 +62,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
   const [unread, setUnread] = useState(0)
   const [uploads, setUploads] = useState<UploadRow[]>([])
   const [notifEnabled, setNotifEnabled] = useState(false)
+  const [earnings, setEarnings] = useState<Earnings | null>(null)
+  const [earningsError, setEarningsError] = useState('')
+  const [copied, setCopied] = useState(false)
+  const [origin, setOrigin] = useState('')
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
@@ -73,6 +89,30 @@ export function AgentDashboardClient({ user }: { user: User }) {
       .limit(10)
     setUploads((ups as UploadRow[]) || [])
   }, [supabase])
+
+  useEffect(() => {
+    setOrigin(window.location.origin)
+    fetch('/api/agent/earnings')
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(data.error || 'Could not load your referral link.')
+        setEarnings(data)
+      })
+      .catch((e) => setEarningsError(e instanceof Error ? e.message : 'Could not load your referral link.'))
+  }, [])
+
+  const referralLink = earnings && origin ? `${origin}/?ref=${earnings.referralCode}` : ''
+
+  const copyLink = async () => {
+    if (!referralLink) return
+    try {
+      await navigator.clipboard.writeText(referralLink)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.prompt('Copy your link:', referralLink)
+    }
+  }
 
   const requestNotif = useCallback(async () => {
     if (typeof Notification === 'undefined') return
@@ -152,8 +192,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
           </div>
         </div>
 
-        <h1 className="mt-8 text-3xl font-bold tracking-tight">Agent Portal</h1>
-        <p className="mt-1 text-sm text-slate-400">Chat with clients and handle their files.</p>
+        <div className="mt-6"><PushPrompt /></div>
+
+        <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
+        <p className="mt-1 text-sm text-slate-400">Chat with clients, share your link, and track your commission.</p>
 
         {/* Stats */}
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -179,6 +221,63 @@ export function AgentDashboardClient({ user }: { user: User }) {
         >
           <MessageCircle className="size-5" /> Open Live Chat Console
         </a>
+
+        {/* Referral link + commission */}
+        <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
+          <h2 className="flex items-center gap-2 font-bold"><Wallet className="size-4 text-emerald-300" /> Your referral link</h2>
+          <p className="mt-1 text-xs text-slate-500">
+            Share this link. When a client submits a brief through it and the job is paid, you earn {earnings ? `${earnings.commissionPercent}%` : 'a commission'} of the job price.
+          </p>
+          {earningsError ? (
+            <p role="alert" className="mt-4 text-sm text-rose-300">{earningsError}</p>
+          ) : !earnings ? (
+            <p className="mt-4 text-sm text-slate-500">Loading…</p>
+          ) : (
+            <>
+              <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                <input
+                  readOnly
+                  value={referralLink}
+                  onFocus={(e) => e.currentTarget.select()}
+                  aria-label="Your referral link"
+                  className="h-11 flex-1 rounded-xl border border-white/10 bg-black/20 px-4 font-mono text-xs text-cyan-100 outline-none"
+                />
+                <button
+                  onClick={copyLink}
+                  className="flex h-11 items-center justify-center gap-2 rounded-xl bg-cyan-300 px-4 text-sm font-bold text-slate-950 hover:bg-cyan-200"
+                >
+                  {copied ? <><Check className="size-4" /> Copied</> : <><Copy className="size-4" /> Copy link</>}
+                </button>
+              </div>
+              <div className="mt-5 grid grid-cols-3 gap-3">
+                {[
+                  ['Briefs referred', String(earnings.referred)],
+                  ['Paid jobs', String(earnings.paidCount)],
+                  ['Earned', `GHS ${earnings.totalEarned.toFixed(2)}`],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-[11px] text-slate-500">{label}</p>
+                    <p className="mt-2 text-lg font-bold">{value}</p>
+                  </div>
+                ))}
+              </div>
+              {earnings.items.length > 0 && (
+                <ul className="mt-4 flex flex-col divide-y divide-white/5 text-sm">
+                  {earnings.items.map((item) => (
+                    <li key={item.id} className="flex items-center justify-between gap-3 py-2">
+                      <span className="min-w-0 truncate"><span className="font-mono text-xs text-cyan-200">{item.ticketId}</span> <span className="text-slate-300">{item.serviceType}</span></span>
+                      <span className={`shrink-0 text-xs ${item.paidAt ? 'text-emerald-300' : 'text-amber-300'}`}>
+                        {item.paidAt ? `+GHS ${Number(item.commissionGhs || 0).toFixed(2)}` : item.status || 'Pending Quote'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="mt-6"><Announcements role={user.role} field={user.field} limit={5} /></div>
 
         {/* Recent files */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>

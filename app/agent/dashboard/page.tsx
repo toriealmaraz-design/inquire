@@ -20,6 +20,7 @@ export default async function AgentDashboardPage() {
         email: user.email,
         image: user.avatar,
         role: user.role,
+        field: user.field,
       }}
     />
   )

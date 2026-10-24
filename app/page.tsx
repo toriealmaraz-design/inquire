@@ -34,6 +34,17 @@ const tracks = [
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 const DEFAULT_SETTINGS: Settings = { whatsapp: '233206478727', telegram: 'GeminiNexusAdmin', instagram: 'GeminiNexusAdmin', snapchat: 'GeminiNexus' }
 const MAX_FILE_BYTES = 50 * 1024 * 1024
+const REF_KEY = 'inquire_ref'
+const REF_DAYS = 30
+
+// Remember which agent's link brought the client here (30 days)
+function readReferral(): string {
+  try {
+    const saved = JSON.parse(localStorage.getItem(REF_KEY) || 'null')
+    if (saved?.code && Date.now() - saved.at < REF_DAYS * 86_400_000) return saved.code
+  } catch {}
+  return ''
+}
 
 function channelHref(channel: Channel, settings: Settings, message: string) {
   const text = encodeURIComponent(message)
@@ -57,6 +68,13 @@ export default function Page() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS)
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get('ref')
+    if (ref && /^[A-Za-z0-9]{4,20}$/.test(ref)) {
+      localStorage.setItem(REF_KEY, JSON.stringify({ code: ref.toUpperCase(), at: Date.now() }))
+    }
+  }, [])
 
   useEffect(() => {
     fetch('/api/settings')
@@ -103,7 +121,7 @@ export default function Page() {
       const response = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ category: track, serviceType: selectedTrack.title, scope: scopeText, urgency, clientContact: contact, briefDetails: brief, fileUrls }),
+        body: JSON.stringify({ category: track, serviceType: selectedTrack.title, scope: scopeText, urgency, clientContact: contact, briefDetails: brief, fileUrls, ref: readReferral() }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'We could not send your brief. Please try again.')

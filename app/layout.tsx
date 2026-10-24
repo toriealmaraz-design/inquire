@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: 'Gemini Nexus | Academic & Technical Solutions',
   description: 'Precision academic reports, software development, web systems, and technical research solutions.',
   generator: 'v0.app',
+  manifest: '/manifest.webmanifest',
   icons: {
     icon: [
       {

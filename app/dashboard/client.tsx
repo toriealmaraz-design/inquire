@@ -3,6 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { PushPrompt } from '@/components/push-prompt'
+import { Announcements } from '@/components/announcements'
+import { FIELDS } from '@/lib/fields'
 import {
   BarChart3,
   Check,
@@ -22,6 +25,8 @@ import {
   FileText,
   Bell,
   Download,
+  Megaphone,
+  Percent,
 } from 'lucide-react'
 
 type User = {
@@ -31,6 +36,7 @@ type User = {
   image?: string | null
   role?: string | null
   status?: string
+  field?: string | null
 }
 
 type DBUser = {
@@ -40,6 +46,7 @@ type DBUser = {
   avatar: string | null
   role: string | null
   status: string
+  field: string | null
   createdAt: string
 }
 
@@ -81,6 +88,11 @@ type IntakeRow = {
   fileUrls: string | null
   status: string | null
   createdAt: string | null
+  referredBy: number | null
+  referrerName: string | null
+  priceGhs: string | null
+  commissionGhs: string | null
+  paidAt: string | null
 }
 
 type DbMsg = {
@@ -127,6 +139,11 @@ export function DashboardClient({ user }: { user: User }) {
   const [conversations, setConversations] = useState<Convo[]>([])
   const [uploads, setUploads] = useState<UploadRow[]>([])
   const [intake, setIntake] = useState<IntakeRow[]>([])
+  const [commissionPercent, setCommissionPercent] = useState('')
+  const [settingsError, setSettingsError] = useState('')
+  const [priceDraft, setPriceDraft] = useState<Record<number, string>>({})
+  const [payingId, setPayingId] = useState<number | null>(null)
+  const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
   const [notifEnabled, setNotifEnabled] = useState(false)
   const [supabase] = useState(() => createClient())
@@ -221,9 +238,9 @@ export function DashboardClient({ user }: { user: User }) {
   
   // Navigation based on role
   const nav = isSuperAdmin
-    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Settings']
+    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Announcements', 'Settings']
     : isSubAdmin
-    ? ['Overview', 'Submissions', 'Chats']
+    ? ['Overview', 'Submissions', 'Chats', 'Announcements']
     : ['Overview', 'Chats']
 
   useEffect(() => {
@@ -232,7 +249,7 @@ export function DashboardClient({ user }: { user: User }) {
         // Load everything in parallel instead of one request after another
         const [usersData, settingsData, intakeData] = await Promise.all([
           isSuperAdmin ? fetch('/api/admin/users').then((r) => r.json()).catch(() => []) : Promise.resolve([]),
-          fetch('/api/settings').then((r) => r.json()).catch(() => ({})),
+          fetch(isSuperAdmin ? '/api/settings?scope=admin' : '/api/settings').then((r) => r.json()).catch(() => ({})),
           fetch('/api/submissions').then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ])
         setUsers(Array.isArray(usersData) ? usersData : [])
@@ -243,6 +260,7 @@ export function DashboardClient({ user }: { user: User }) {
           instagram: settingsData.instagram || '',
           snapchat: settingsData.snapchat || '',
         })
+        if (settingsData.commissionPercent !== undefined) setCommissionPercent(String(settingsData.commissionPercent))
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -264,15 +282,40 @@ export function DashboardClient({ user }: { user: User }) {
     }
   }
 
+  const markPaid = async (id: number) => {
+    setPayingId(id)
+    setPayError((e) => ({ ...e, [id]: '' }))
+    try {
+      const res = await fetch('/api/submissions', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, priceGhs: Number(priceDraft[id]) }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || 'Could not mark as paid.')
+      setIntake((rows) => rows.map((r) => (r.id === id ? { ...r, status: data.status, priceGhs: data.priceGhs, commissionGhs: data.commissionGhs, paidAt: data.paidAt } : r)))
+    } catch (caught) {
+      setPayError((e) => ({ ...e, [id]: caught instanceof Error ? caught.message : 'Could not mark as paid.' }))
+    } finally {
+      setPayingId(null)
+    }
+  }
+
   const saveSettings = async () => {
     setSettingsLoading(true)
     setSettingsSaved(false)
     try {
-      await fetch('/api/settings', {
+      setSettingsError('')
+      const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({ ...settings, commissionPercent: commissionPercent === '' ? undefined : Number(commissionPercent) }),
       })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setSettingsError(data.error || 'Could not save settings.')
+        return
+      }
       setSettingsSaved(true)
       setTimeout(() => setSettingsSaved(false), 3000)
     } catch (error) {
@@ -327,6 +370,7 @@ export function DashboardClient({ user }: { user: User }) {
                 {item === 'Submissions' && <FileText className="size-4" />}
                 {item === 'Chats' && <MessageCircle className="size-4" />}
                 {item === 'Settings' && <Settings2 className="size-4" />}
+                {item === 'Announcements' && <Megaphone className="size-4" />}
                 {item}
                 {item === 'User Management' && pendingCount > 0 && (
                   <span className="ml-auto rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">
@@ -420,6 +464,8 @@ export function DashboardClient({ user }: { user: User }) {
             </button>
           </div>
 
+          <div className="mt-6"><PushPrompt /></div>
+
           {/* Overview Tab */}
           {tab === 'Overview' && (
             <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -468,12 +514,13 @@ export function DashboardClient({ user }: { user: User }) {
                 <p className="text-center py-12 text-slate-500">No users yet</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[700px] text-left text-sm">
+                  <table className="w-full min-w-[820px] text-left text-sm">
                     <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-500">
                       <tr>
                         <th className="pb-3">User</th>
                         <th className="pb-3">Email</th>
                         <th className="pb-3">Role</th>
+                        <th className="pb-3">Field</th>
                         <th className="pb-3">Status</th>
                         <th className="pb-3">Actions</th>
                       </tr>
@@ -505,6 +552,19 @@ export function DashboardClient({ user }: { user: User }) {
                                 <option key={r.value} value={r.value} className="bg-slate-900">
                                   {r.label}
                                 </option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="py-4">
+                            <select
+                              value={u.field || ''}
+                              onChange={e => updateUser(u.id, { field: e.target.value || null })}
+                              aria-label={`Field for ${u.name}`}
+                              className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-xs text-white"
+                            >
+                              <option value="" className="bg-slate-900">Unassigned</option>
+                              {FIELDS.map(f => (
+                                <option key={f.value} value={f.value} className="bg-slate-900">{f.label}</option>
                               ))}
                             </select>
                           </td>
@@ -571,7 +631,7 @@ export function DashboardClient({ user }: { user: User }) {
                           <span className="font-mono text-xs text-cyan-200">{s.ticketId}</span>
                           <span className="text-sm font-medium text-white">{s.serviceType}</span>
                         </div>
-                        <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] text-amber-300">{s.status || 'Pending Quote'}</span>
+                        <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">
                         {[s.scope, s.urgency, s.clientContact ? `Contact: ${s.clientContact}` : null, s.createdAt ? fmtTime(s.createdAt) : null].filter(Boolean).join(' · ')}
@@ -582,6 +642,38 @@ export function DashboardClient({ user }: { user: User }) {
                           <Download className="size-4" /> Download attachment
                         </a>
                       )}
+                      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
+                        <span className="text-slate-400">
+                          {s.referrerName ? <>Referred by <strong className="text-cyan-200">{s.referrerName}</strong></> : 'No referral'}
+                        </span>
+                        {s.paidAt ? (
+                          <span className="ml-auto text-emerald-300">
+                            Paid GHS {Number(s.priceGhs).toFixed(2)}{s.commissionGhs ? ` · commission GHS ${Number(s.commissionGhs).toFixed(2)}` : ''}
+                          </span>
+                        ) : (
+                          <span className="ml-auto flex items-center gap-2">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="Price GHS"
+                              value={priceDraft[s.id] ?? ''}
+                              onChange={(e) => setPriceDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                              aria-label={`Job price for ${s.ticketId}`}
+                              className="h-9 w-28 rounded-lg border border-white/10 bg-white/10 px-2 text-white outline-none focus:border-cyan-500/50"
+                            />
+                            <button
+                              onClick={() => markPaid(s.id)}
+                              disabled={payingId === s.id || !priceDraft[s.id]}
+                              className="h-9 rounded-lg bg-emerald-500/20 px-3 font-bold text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
+                            >
+                              {payingId === s.id ? 'Saving…' : 'Mark paid'}
+                            </button>
+                          </span>
+                        )}
+                      </div>
+                      {payError[s.id] && <p role="alert" className="mt-2 text-xs text-rose-300">{payError[s.id]}</p>}
                     </div>
                   ))}
                 </div>
@@ -669,6 +761,11 @@ export function DashboardClient({ user }: { user: User }) {
             </div>
           )}
 
+          {/* Announcements Tab */}
+          {tab === 'Announcements' && (
+            <div className="mt-8"><Announcements role={user.role} field={user.field} /></div>
+          )}
+
           {/* Settings Tab (Super Admin only) */}
           {tab === 'Settings' && isSuperAdmin && (
             <div className="mt-8 grid gap-6 xl:grid-cols-[1fr_300px]">
@@ -679,6 +776,7 @@ export function DashboardClient({ user }: { user: User }) {
                     <h2 className="font-bold">Connectors</h2>
                     <p className="mt-1 text-xs text-slate-500">Configure social media & messaging channels.</p>
                   </div>
+                  {settingsError && <span role="alert" className="text-xs text-rose-300">{settingsError}</span>}
                   {settingsSaved && (
                     <span className="flex items-center gap-1 text-xs text-emerald-400">
                       <Check className="size-4" /> Saved
@@ -734,6 +832,23 @@ export function DashboardClient({ user }: { user: User }) {
                       className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
                     />
                   </div>
+                </div>
+
+                <div className="mt-6 max-w-xs">
+                  <label className="flex items-center gap-2 text-xs font-medium text-slate-400 mb-2">
+                    <Percent className="size-4" /> Agent commission (% of job price)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    step="0.5"
+                    value={commissionPercent}
+                    onChange={e => setCommissionPercent(e.target.value)}
+                    placeholder="10"
+                    className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
+                  />
+                  <p className="mt-2 text-[11px] text-slate-500">Agents earn this % of the job price when a brief from their link is marked paid.</p>
                 </div>
 
                 <button

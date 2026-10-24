@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNull } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 
@@ -25,6 +25,36 @@ export type AppUser = {
   avatar: string | null
   role: string | null
   status: string
+  field: string | null
+  referralCode: string | null
+}
+
+// Active staff member (any chat role) or null
+export async function getStaffUser(): Promise<AppUser | null> {
+  const user = await getUser()
+  return user && user.status === 'active' && canChat(user.role) ? user : null
+}
+
+// Give a staff member a unique referral code (created once, then reused)
+export async function ensureReferralCode(user: AppUser): Promise<string> {
+  if (user.referralCode) return user.referralCode
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = Math.random().toString(36).slice(2, 10).toUpperCase()
+    try {
+      const [row] = await db
+        .update(users)
+        .set({ referralCode: code })
+        .where(and(eq(users.id, user.id), isNull(users.referralCode)))
+        .returning({ referralCode: users.referralCode })
+      if (row?.referralCode) return row.referralCode
+      // Someone else set it concurrently: read it back
+      const [existing] = await db.select({ referralCode: users.referralCode }).from(users).where(eq(users.id, user.id)).limit(1)
+      if (existing?.referralCode) return existing.referralCode
+    } catch {
+      // unique collision: try another code
+    }
+  }
+  throw new Error('Could not create referral code')
 }
 
 // Get current user with app-level data

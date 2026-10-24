@@ -28,5 +28,6 @@ export default async function AgentChatPage() {
     email: user.email,
     image: user.avatar,
     role: user.role,
+    field: user.field,
   }} />
 }

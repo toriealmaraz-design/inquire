@@ -73,5 +73,6 @@ export default async function DashboardPage() {
     image: user.avatar,
     role: user.role,
     status: user.status,
+    field: user.field,
   }} />
 }
