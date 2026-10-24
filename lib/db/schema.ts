@@ -137,3 +137,11 @@ export const chatbotReplies = pgTable('chatbot_replies', {
   enabled: boolean('enabled').notNull().default(true),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 })
+
+// Questions the chatbot couldn't answer (so admins can add answers)
+export const chatbotMisses = pgTable('chatbot_misses', {
+  id: serial('id').primaryKey(),
+  question: varchar('question', { length: 300 }).notNull().unique(),
+  hits: integer('hits').notNull().default(1),
+  lastAt: timestamp('last_at').notNull().defaultNow(),
+})

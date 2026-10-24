@@ -108,6 +108,13 @@ export default function ChatPage() {
     if (stored.convoId) setConvoId(stored.convoId)
     setNameDraft(stored.named ? stored.name : '')
     setContactDraft(stored.contact || '')
+    // Pre-fill from the chatbot handoff (?msg=) or the brief success screen (?ticket=)
+    const params = new URLSearchParams(window.location.search)
+    const preset = params.get('msg') || (params.get('ticket') ? `Hi, I just submitted brief ${params.get('ticket')}.` : '')
+    if (preset) {
+      setInput(preset.slice(0, 1000))
+      window.history.replaceState(null, '', '/chat')
+    }
   }, [])
 
   // Real "online": is any admin on the chat console or dashboard right now?

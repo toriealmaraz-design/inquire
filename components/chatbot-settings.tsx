@@ -17,6 +17,26 @@ export function ChatbotSettings() {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [misses, setMisses] = useState<{ id: number; question: string; hits: number }[]>([])
+
+  useEffect(() => {
+    fetch('/api/chatbot/miss')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((rows) => setMisses(Array.isArray(rows) ? rows : []))
+      .catch(() => {})
+  }, [])
+
+  const dismissMiss = (id: number) => {
+    setMisses((m) => m.filter((x) => x.id !== id))
+    fetch('/api/chatbot/miss', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ids: [id] }) }).catch(() => {})
+  }
+
+  // Turn an unanswered question into a new answer (pre-filled), then remove it from the list
+  const answerMiss = (m: { id: number; question: string }) => {
+    const words = m.question.replace(/[^a-z0-9 ]/gi, ' ').split(/\s+/).filter((w) => w.length > 3).slice(0, 4)
+    setItems((l) => [...l, { question: m.question.charAt(0).toUpperCase() + m.question.slice(1), keywords: words.join(', '), reply: '', enabled: true }])
+    dismissMiss(m.id)
+  }
 
   useEffect(() => {
     fetch('/api/chatbot?scope=admin')
@@ -82,6 +102,22 @@ export function ChatbotSettings() {
         <>
           <label className="mt-5 block text-xs font-medium text-slate-400">Greeting (sent automatically on a client's first message)</label>
           <textarea value={greeting} onChange={(e) => setGreeting(e.target.value)} rows={2} maxLength={600} className={`${field} mt-2 py-2`} />
+
+          {misses.length > 0 && (
+            <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-4">
+              <p className="text-sm font-semibold text-amber-100">Questions the chatbot couldn&apos;t answer</p>
+              <p className="mt-1 text-[11px] text-slate-400">Add an answer so the bot handles them next time. Remember to save.</p>
+              <ul className="mt-3 flex flex-col gap-2">
+                {misses.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="min-w-0 flex-1 text-slate-200">&ldquo;{m.question}&rdquo; <span className="text-[11px] text-slate-500">· asked {m.hits}×</span></span>
+                    <button onClick={() => answerMiss(m)} className="rounded-lg bg-cyan-500/20 px-2.5 py-1 text-xs font-bold text-cyan-200 hover:bg-cyan-500/30">Add answer</button>
+                    <button onClick={() => dismissMiss(m.id)} className="rounded-lg px-2 py-1 text-xs text-slate-400 hover:text-white">Dismiss</button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="mt-6 flex flex-col gap-3">
             {items.map((it, i) => (

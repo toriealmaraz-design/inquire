@@ -1,15 +1,27 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Bot, X, Send, MessageCircle } from 'lucide-react'
+import { usePathname } from 'next/navigation'
+import { Bot, X, Send, MessageCircle, RotateCcw, FileText } from 'lucide-react'
 
 type Reply = { id: number; question: string; keywords: string; reply: string }
-type Line = { from: 'bot' | 'me'; text: string; handoff?: boolean }
+type Line = { from: 'bot' | 'me'; text: string; handoff?: string; brief?: boolean }
 
-const FALLBACK = "I'm not sure about that one. Our team can help you directly in Live Chat."
+const HISTORY_KEY = 'nexus_bot_history'
+const WELCOME: Line = {
+  from: 'bot',
+  text: "Hi! I'm the Gemini Nexus assistant. Ask me about prices, deadlines, files or payment, type your ticket number (like GN-1042) to check a brief, or pick a question below.",
+}
+// Staff pages and the live chat itself don't need the assistant
+const HIDDEN_ON = ['/chat', '/dashboard', '/agent', '/auth', '/admin']
 
-// Simple keyword matching: no AI service, works for free and instantly
-function answer(text: string, replies: Reply[]): Reply | null {
+const GREETINGS = /^(hi|hello|hey|good (morning|afternoon|evening)|yo|hiya)\b/i
+const THANKS = /\b(thanks|thank you|thx|ok(ay)?|cool|great)\b/i
+const HUMAN = /\b(human|person|agent|admin|someone|real person|talk to|speak to|call)\b/i
+const BRIEF = /\b(start|submit|new brief|order|request|get started|place an order)\b/i
+
+// Keyword scoring: longer/more matches win. No AI service: free and instant.
+function match(text: string, replies: Reply[]): Reply | null {
   const msg = text.toLowerCase()
   let best: { r: Reply; score: number } | null = null
   for (const r of replies) {
@@ -24,13 +36,25 @@ function answer(text: string, replies: Reply[]): Reply | null {
 }
 
 export function ChatbotWidget() {
+  const pathname = usePathname() || '/'
   const [open, setOpen] = useState(false)
   const [replies, setReplies] = useState<Reply[]>([])
-  const [lines, setLines] = useState<Line[]>([
-    { from: 'bot', text: "Hi! I'm the Gemini Nexus assistant. Ask me about prices, deadlines, files or payment, or pick a question below." },
-  ])
+  const [lines, setLines] = useState<Line[]>([WELCOME])
   const [input, setInput] = useState('')
+  const [typing, setTyping] = useState(false)
   const endRef = useRef<HTMLDivElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  // Keep the conversation while the visitor moves around the site
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(sessionStorage.getItem(HISTORY_KEY) || 'null')
+      if (Array.isArray(saved) && saved.length) setLines(saved)
+    } catch {}
+  }, [])
+  useEffect(() => {
+    sessionStorage.setItem(HISTORY_KEY, JSON.stringify(lines.slice(-40)))
+  }, [lines])
 
   useEffect(() => {
     if (!open || replies.length) return
@@ -40,15 +64,57 @@ export function ChatbotWidget() {
       .catch(() => {})
   }, [open, replies.length])
 
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [lines, open])
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
+    if (open) inputRef.current?.focus()
+  }, [lines, open, typing])
 
-  const ask = (text: string, picked?: Reply) => {
-    const q = text.trim()
-    if (!q) return
-    const hit = picked ?? answer(q, replies)
-    setLines((l) => [...l, { from: 'me', text: q }, hit ? { from: 'bot', text: hit.reply } : { from: 'bot', text: FALLBACK, handoff: true }])
-    setInput('')
+  if (HIDDEN_ON.some((p) => pathname.startsWith(p))) return null
+
+  const respond = async (q: string, picked?: Reply): Promise<Line> => {
+    if (picked) return { from: 'bot', text: picked.reply }
+
+    const ticket = q.toUpperCase().match(/GN-?\d{3,6}/)
+    if (ticket) {
+      try {
+        const res = await fetch(`/api/ticket?id=${encodeURIComponent(ticket[0])}`)
+        const d = await res.json()
+        if (d.found) return { from: 'bot', text: `Brief ${d.ticketId} (${d.serviceType}) is currently: ${d.status}. For details, our team can update you in Live Chat.`, handoff: `Hi, I'd like an update on my brief ${d.ticketId}.` }
+        return { from: 'bot', text: `I couldn't find ${ticket[0]}. Please check the number. Our team can help in Live Chat.`, handoff: `Hi, I can't find my brief ${ticket[0]}.` }
+      } catch {
+        return { from: 'bot', text: "I couldn't check that ticket right now. Please ask our team in Live Chat.", handoff: `Hi, can you check my brief ${ticket[0]}?` }
+      }
+    }
+
+    const hit = match(q, replies)
+    if (hit) return { from: 'bot', text: hit.reply }
+    if (HUMAN.test(q)) return { from: 'bot', text: 'Sure, our team is available in Live Chat. Your question will be ready to send.', handoff: q }
+    if (BRIEF.test(q)) return { from: 'bot', text: 'You can submit a brief on the homepage in three quick steps (track, details, contact). You get a custom GHS quote with no deposit.', brief: true }
+    if (GREETINGS.test(q)) return { from: 'bot', text: 'Hello! How can I help? You can ask about prices, deadlines, files, payment or your brief status.' }
+    if (THANKS.test(q) && q.length < 25) return { from: 'bot', text: "You're welcome! Anything else I can help with?" }
+
+    fetch('/api/chatbot/miss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) }).catch(() => {})
+    return { from: 'bot', text: "I'm not sure about that one. Our team can answer it in Live Chat. I'll pass your question along.", handoff: q }
   }
+
+  const ask = async (text: string, picked?: Reply) => {
+    const q = text.trim()
+    if (!q || typing) return
+    setInput('')
+    setLines((l) => [...l, { from: 'me', text: q }])
+    setTyping(true)
+    const [reply] = await Promise.all([respond(q, picked), new Promise((r) => setTimeout(r, 450))])
+    setTyping(false)
+    setLines((l) => [...l, reply])
+  }
+
+  const reset = () => {
+    setLines([WELCOME])
+    sessionStorage.removeItem(HISTORY_KEY)
+  }
+
+  const asked = new Set(lines.filter((l) => l.from === 'me').map((l) => l.text))
+  const suggestions = replies.filter((r) => !asked.has(r.question)).slice(0, 5)
 
   return (
     <>
@@ -56,36 +122,57 @@ export function ChatbotWidget() {
         <div
           role="dialog"
           aria-label="Gemini Nexus assistant"
-          className="fixed bottom-24 right-4 z-50 flex h-[min(560px,calc(100dvh-8rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#0a1929] shadow-2xl shadow-black/50"
+          className="fixed bottom-24 right-4 z-50 flex h-[min(580px,calc(100dvh-8rem))] w-[min(380px,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#0a1929] shadow-2xl shadow-black/50"
         >
           <div className="flex items-center gap-3 border-b border-white/10 px-4 py-3">
             <div className="flex size-9 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500"><Bot className="size-5" /></div>
             <div className="flex-1">
               <p className="text-sm font-semibold text-white">Nexus Assistant</p>
-              <p className="text-[11px] text-emerald-300">Instant answers</p>
+              <p className="text-[11px] text-emerald-300">Instant answers, 24/7</p>
             </div>
+            <button onClick={reset} aria-label="Start over" title="Start over" className="rounded-full p-1.5 text-slate-400 hover:bg-white/5 hover:text-white">
+              <RotateCcw className="size-4" />
+            </button>
             <button onClick={() => setOpen(false)} aria-label="Close assistant" className="rounded-full p-1 text-slate-400 hover:bg-white/5 hover:text-white">
               <X className="size-5" />
             </button>
           </div>
 
-          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4">
+          <div className="flex-1 space-y-2 overflow-y-auto px-4 py-4" aria-live="polite">
             {lines.map((l, i) => (
               <div key={i} className={`flex ${l.from === 'me' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed ${l.from === 'me' ? 'rounded-br-md bg-[#0c5f4a] text-white' : 'rounded-bl-md bg-[#0f2847] text-slate-100'}`}>
+                <div className={`max-w-[85%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm leading-relaxed ${l.from === 'me' ? 'rounded-br-md bg-[#0c5f4a] text-white' : 'rounded-bl-md bg-[#0f2847] text-slate-100'}`}>
                   {l.text}
-                  {l.handoff && (
-                    <a href="/chat" className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300">
-                      <MessageCircle className="size-3.5" /> Talk to our team
+                  {l.handoff !== undefined && (
+                    <a
+                      href={`/chat?msg=${encodeURIComponent(l.handoff)}`}
+                      className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300"
+                    >
+                      <MessageCircle className="size-3.5" /> Continue in Live Chat
+                    </a>
+                  )}
+                  {l.brief && (
+                    <a href="/#intake" onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300">
+                      <FileText className="size-3.5" /> Start a brief
                     </a>
                   )}
                 </div>
               </div>
             ))}
 
-            {replies.length > 0 && (
+            {typing && (
+              <div className="flex justify-start">
+                <div className="flex gap-1 rounded-2xl rounded-bl-md bg-[#0f2847] px-3 py-3" aria-label="Assistant is typing">
+                  {[0, 150, 300].map((d) => (
+                    <span key={d} className="size-1.5 animate-bounce rounded-full bg-slate-400" style={{ animationDelay: `${d}ms` }} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {!typing && suggestions.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
-                {replies.slice(0, 7).map((r) => (
+                {suggestions.map((r) => (
                   <button
                     key={r.id}
                     onClick={() => ask(r.question, r)}
@@ -108,14 +195,15 @@ export function ChatbotWidget() {
               className="flex gap-2"
             >
               <input
+                ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a question…"
+                placeholder="Ask a question or type GN-1042…"
                 aria-label="Ask the assistant"
                 maxLength={300}
                 className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-500/50"
               />
-              <button type="submit" disabled={!input.trim()} aria-label="Send" className="flex size-10 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400">
+              <button type="submit" disabled={!input.trim() || typing} aria-label="Send" className="flex size-10 items-center justify-center rounded-xl bg-cyan-500 text-slate-950 hover:bg-cyan-400 disabled:bg-slate-700 disabled:text-slate-400">
                 <Send className="size-4" />
               </button>
             </form>

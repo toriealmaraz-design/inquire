@@ -1,6 +1,7 @@
 import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
+import { ChatbotWidget } from '@/components/chatbot-widget'
 
 export const metadata: Metadata = {
   title: 'Gemini Nexus | Academic & Technical Solutions',
@@ -43,6 +44,7 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         {children}
+        <ChatbotWidget />
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>
     </html>
