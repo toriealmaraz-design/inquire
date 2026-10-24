@@ -80,6 +80,8 @@ export const submissions = pgTable('submissions', {
   referredBy: integer('referred_by').references(() => users.id),
   priceGhs: numeric('price_ghs', { precision: 10, scale: 2 }),
   commissionGhs: numeric('commission_ghs', { precision: 10, scale: 2 }),
+  referralCommissionGhs: numeric('referral_commission_ghs', { precision: 10, scale: 2 }),
+  assignedAt: timestamp('assigned_at'),
   paidAt: timestamp('paid_at'),
   createdAt: timestamp('created_at').defaultNow(),
 })

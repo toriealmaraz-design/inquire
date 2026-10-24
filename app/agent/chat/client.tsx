@@ -56,6 +56,12 @@ function rowToMessage(r: DbMessage): Message {
   }
 }
 
+// Agents never see client files; admins do
+const ADMIN_ROLE_LIST = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist']
+function maskFiles(text: string, admin: boolean) {
+  return !admin && text.startsWith('📎') ? '📎 A file was shared (visible to admins only)' : text
+}
+
 function renderContent(text: string) {
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
   return parts.map((part, i) =>
@@ -70,6 +76,7 @@ function renderContent(text: string) {
 }
 
 export function AgentChatClient({ user }: { user: User }) {
+  const isAdminUser = ADMIN_ROLE_LIST.includes(user.role || '')
   const supabase = createClient()
   const router = useRouter()
   const numericUserId = user.id ? parseInt(user.id, 10) : null
@@ -119,7 +126,7 @@ export function AgentChatClient({ user }: { user: User }) {
       return {
         id: c.id,
         clientName: c.client_name,
-        lastMessage: last ? last.content : 'No messages yet',
+        lastMessage: last ? maskFiles(last.content, isAdminUser) : 'No messages yet',
         unread,
         time: last ? fmtTime(last.created_at) : fmtTime(c.updated_at),
         updatedAt: c.updated_at,
@@ -166,7 +173,7 @@ export function AgentChatClient({ user }: { user: User }) {
         }
         if (r.sender_type === 'client' && activeConvoRef.current !== r.conversation_id) {
           if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('New client message', { body: r.content.slice(0, 120) })
+            new Notification('New client message', { body: maskFiles(r.content, isAdminUser).slice(0, 120) })
           }
         }
       })
@@ -376,7 +383,7 @@ export function AgentChatClient({ user }: { user: User }) {
                         : 'bg-[#0f2847] text-slate-100 rounded-tl-none'
                     }`}
                   >
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(m.text)}</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(maskFiles(m.text, isAdminUser))}</p>
                     <div className={`flex items-center gap-1 mt-1 ${m.sender === 'agent' ? 'justify-end' : ''}`}>
                       <span className="text-[10px] text-slate-400">{m.time}</span>
                       {m.sender === 'agent' && (
@@ -392,9 +399,9 @@ export function AgentChatClient({ user }: { user: User }) {
           {/* Input */}
           <div className="border-t border-white/10 bg-[#0a1929] px-3 py-2">
             <div className="flex items-end gap-2 max-w-2xl mx-auto">
-              <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-slate-400 hover:text-cyan-300 disabled:opacity-50">
+              {isAdminUser && <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-slate-400 hover:text-cyan-300 disabled:opacity-50">
                 <Paperclip className="size-5" />
-              </button>
+              </button>}
               <input ref={fileInputRef} type="file" className="hidden" onChange={handleFile} />
               <div className="flex-1 rounded-2xl bg-[#0f2847] border border-white/10">
                 <textarea

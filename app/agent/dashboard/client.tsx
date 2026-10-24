@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { MessageCircle, LogOut, FileText, Bell, Download, Zap, Copy, Check, Wallet } from 'lucide-react'
+import { MessageCircle, LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { Announcements } from '@/components/announcements'
 
@@ -16,23 +16,31 @@ type User = {
   field?: string | null
 }
 
-type UploadRow = {
-  id: number
-  conversation_id: number | null
-  file_name: string
-  file_url: string
-  file_size: number | null
-  uploaded_by: string
-  created_at: string
-}
 
 type Earnings = {
   referralCode: string
   commissionPercent: number
+  assignedCount: number
   referred: number
   paidCount: number
   totalEarned: number
-  items: { id: number; ticketId: string; serviceType: string; status: string | null; commissionGhs: string | null; paidAt: string | null; createdAt: string | null }[]
+  pendingEarnings: number
+  items: {
+    id: number
+    ticketId: string
+    category: string
+    serviceType: string
+    scope: string | null
+    urgency: string | null
+    briefDetails: string | null
+    status: string | null
+    priceGhs: string | null
+    myCommission: number
+    assignedToMe: boolean
+    referredByMe: boolean
+    paidAt: string | null
+    createdAt: string | null
+  }[]
 }
 
 type DbMsg = {
@@ -44,23 +52,13 @@ type DbMsg = {
 
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 
-function fmtTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
-}
 
-function fmtSize(bytes: number | null) {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
 
 export function AgentDashboardClient({ user }: { user: User }) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
   const [convoCount, setConvoCount] = useState(0)
   const [unread, setUnread] = useState(0)
-  const [uploads, setUploads] = useState<UploadRow[]>([])
   const [notifEnabled, setNotifEnabled] = useState(false)
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
@@ -82,12 +80,6 @@ export function AgentDashboardClient({ user }: { user: User }) {
       .eq('sender_type', 'client')
       .eq('read', false)
     setUnread(((msgs as DbMsg[] | null) || []).length)
-    const { data: ups } = await supabase
-      .from('uploads')
-      .select('id, conversation_id, file_name, file_url, file_size, uploaded_by, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10)
-    setUploads((ups as UploadRow[]) || [])
   }, [supabase])
 
   useEffect(() => {
@@ -135,7 +127,6 @@ export function AgentDashboardClient({ user }: { user: User }) {
     const channel = supabase
       .channel('agent-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         scheduleReload()
         const r = payload.new as any
@@ -195,14 +186,14 @@ export function AgentDashboardClient({ user }: { user: User }) {
         <div className="mt-6"><PushPrompt /></div>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
-        <p className="mt-1 text-sm text-slate-400">Chat with clients, share your link, and track your commission.</p>
+        <p className="mt-1 text-sm text-slate-400">Your assignments, referral link and commission.</p>
 
         {/* Stats */}
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {[
             ['Conversations', convoCount, MessageCircle, 'text-blue-400'],
             ['Unread', unread, Bell, 'text-rose-400'],
-            ['Files', uploads.length, FileText, 'text-violet-400'],
+            ['Assignments', earnings?.assignedCount ?? 0, FileText, 'text-violet-400'],
           ].map(([label, value, Icon, color]: any) => (
             <div key={label} className={`${glass} rounded-2xl p-5`}>
               <div className="flex items-center justify-between">
@@ -249,9 +240,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
                   {copied ? <><Check className="size-4" /> Copied</> : <><Copy className="size-4" /> Copy link</>}
                 </button>
               </div>
-              <div className="mt-5 grid grid-cols-3 gap-3">
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
                 {[
                   ['Briefs referred', String(earnings.referred)],
+                  ['Pending', `GHS ${earnings.pendingEarnings.toFixed(2)}`],
                   ['Paid jobs', String(earnings.paidCount)],
                   ['Earned', `GHS ${earnings.totalEarned.toFixed(2)}`],
                 ].map(([label, value]) => (
@@ -261,60 +253,41 @@ export function AgentDashboardClient({ user }: { user: User }) {
                   </div>
                 ))}
               </div>
-              {earnings.items.length > 0 && (
-                <ul className="mt-4 flex flex-col divide-y divide-white/5 text-sm">
-                  {earnings.items.map((item) => (
-                    <li key={item.id} className="flex items-center justify-between gap-3 py-2">
-                      <span className="min-w-0 truncate"><span className="font-mono text-xs text-cyan-200">{item.ticketId}</span> <span className="text-slate-300">{item.serviceType}</span></span>
-                      <span className={`shrink-0 text-xs ${item.paidAt ? 'text-emerald-300' : 'text-amber-300'}`}>
-                        {item.paidAt ? `+GHS ${Number(item.commissionGhs || 0).toFixed(2)}` : item.status || 'Pending Quote'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
             </>
           )}
         </div>
 
-        <div className="mt-6"><Announcements role={user.role} field={user.field} limit={5} /></div>
-
-        {/* Recent files */}
+        {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-          <h2 className="font-bold">Recent Files</h2>
-          <p className="mt-1 text-xs text-slate-500">Latest uploads across conversations.</p>
-          {uploads.length === 0 ? (
-            <div className="mt-6 text-center py-10 text-slate-500">
-              <FileText className="size-10 mx-auto mb-3 opacity-50" />
-              <p className="text-sm">No files yet</p>
-            </div>
+          <h2 className="font-bold">My assignments</h2>
+          <p className="mt-1 text-xs text-slate-500">Jobs an admin gave you, with the price and your commission. Commission is earned when the job is marked paid.</p>
+          {!earnings ? (
+            <p className="mt-4 text-sm text-slate-500">Loading…</p>
+          ) : earnings.items.filter((i) => i.assignedToMe || i.referredByMe).length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">No assignments yet. An admin will assign work to you.</p>
           ) : (
-            <div className="mt-4 flex flex-col gap-3">
-              {uploads.map((f) => (
-                <div key={f.id} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/5 p-3">
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-cyan-500/15 text-cyan-300">
-                    <FileText className="size-5" />
+            <ul className="mt-4 flex flex-col gap-3">
+              {earnings.items.map((item) => (
+                <li key={item.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <span className="min-w-0"><span className="font-mono text-xs text-cyan-200">{item.ticketId}</span> <span className="text-sm font-medium text-white">{item.serviceType}</span></span>
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] ${item.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{item.paidAt ? 'Paid' : item.status || 'Pending'}</span>
                   </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-white">{f.file_name}</p>
-                    <p className="text-[11px] text-slate-500">
-                      {f.uploaded_by === 'client' ? 'Client' : 'Agent'} · Convo #{f.conversation_id ?? '—'} · {fmtSize(f.file_size)} · {fmtTime(f.created_at)}
-                    </p>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    {[item.assignedToMe ? 'Assigned to you' : null, item.referredByMe ? 'Your referral' : null, item.scope, item.urgency].filter(Boolean).join(' · ')}
+                  </p>
+                  {item.briefDetails && <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{item.briefDetails}</p>}
+                  <div className="mt-3 flex flex-wrap gap-4 border-t border-white/10 pt-3 text-xs">
+                    {item.priceGhs && <span className="text-slate-400">Job price <strong className="text-white">GHS {Number(item.priceGhs).toFixed(2)}</strong></span>}
+                    <span className="text-slate-400">Your commission <strong className={item.paidAt ? 'text-emerald-300' : 'text-amber-200'}>{item.myCommission ? `GHS ${item.myCommission.toFixed(2)}` : 'set when an admin prices it'}</strong></span>
                   </div>
-                  <a
-                    href={f.file_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    download
-                    className="flex shrink-0 items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500"
-                  >
-                    <Download className="size-4" /> Download
-                  </a>
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
           )}
         </div>
+
+        <div className="mt-6"><Announcements role={user.role} field={user.field} limit={5} /></div>
 
         <a href="/" className="mt-6 inline-flex items-center gap-2 text-xs text-slate-500 hover:text-white">
           <Zap className="size-4" /> View Site

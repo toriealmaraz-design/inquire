@@ -3,7 +3,7 @@ import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
-import { ADMIN_ROLES, getStaffUser, isAdmin } from '@/lib/auth'
+import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin } from '@/lib/auth'
 import { fieldLabel } from '@/lib/fields'
 import { sendPush } from '@/lib/push'
 
@@ -14,6 +14,7 @@ function clean(value: unknown, maxLength: number) {
 }
 
 const referrer = alias(users, 'referrer')
+const assignee = alias(users, 'assignee')
 
 // Admins: all intake briefs, with who referred them
 export async function GET() {
@@ -36,6 +37,8 @@ export async function GET() {
         status: submissions.status,
         referredBy: submissions.referredBy,
         referrerName: referrer.name,
+        assignedTo: submissions.assignedTo,
+        assigneeName: assignee.name,
         priceGhs: submissions.priceGhs,
         commissionGhs: submissions.commissionGhs,
         paidAt: submissions.paidAt,
@@ -43,6 +46,7 @@ export async function GET() {
       })
       .from(submissions)
       .leftJoin(referrer, eq(submissions.referredBy, referrer.id))
+      .leftJoin(assignee, eq(submissions.assignedTo, assignee.id))
       .orderBy(desc(submissions.createdAt))
       .limit(100)
     return NextResponse.json(rows)
@@ -130,7 +134,10 @@ export async function POST(request: Request) {
   }
 }
 
-// Admins: mark a brief as paid. Commission = price × the % in Settings.
+// Admins:
+//  { action: 'assign', id, assignedTo, priceGhs }  -> give the job to an agent with its price (required)
+//  { action: 'paid', id }                           -> client paid; commissions become earned
+// Commission = price x the % in Settings, for the assigned agent and (separately) the referrer.
 export async function PATCH(request: Request) {
   const user = await getStaffUser()
   if (!user || !isAdmin(user.role)) {
@@ -139,41 +146,73 @@ export async function PATCH(request: Request) {
 
   const body = await request.json().catch(() => null)
   const id = Number(body?.id)
-  const price = Number(body?.priceGhs)
   if (!Number.isInteger(id) || id < 1) return NextResponse.json({ error: 'Valid brief ID required.' }, { status: 400 })
-  if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
-    return NextResponse.json({ error: 'Enter the job price in GHS.' }, { status: 400 })
-  }
 
   try {
     const [existing] = await db.select().from(submissions).where(eq(submissions.id, id)).limit(1)
     if (!existing) return NextResponse.json({ error: 'Brief not found.' }, { status: 404 })
-    if (existing.paidAt) return NextResponse.json({ error: 'This brief is already marked paid.' }, { status: 409 })
+    if (existing.paidAt) return NextResponse.json({ error: 'This job is already paid and locked.' }, { status: 409 })
 
-    const [config] = await db.select({ pct: settings.commissionPercent }).from(settings).where(eq(settings.id, 1)).limit(1)
-    const pct = Number(config?.pct ?? 10)
-    const commission = existing.referredBy ? Math.round(price * pct) / 100 : null
-
-    const [updated] = await db
-      .update(submissions)
-      .set({ status: 'Paid', priceGhs: price.toFixed(2), commissionGhs: commission === null ? null : commission.toFixed(2), paidAt: new Date() })
-      .where(eq(submissions.id, id))
-      .returning()
-
-    if (existing.referredBy && commission !== null) {
-      try {
-        await sendPush(
-          { userIds: [existing.referredBy] },
-          { title: `You earned GHS ${commission.toFixed(2)}`, body: `Commission for ${existing.ticketId} (${pct}% of GHS ${price.toFixed(2)}).`, url: '/agent/dashboard' }
-        )
-      } catch (error) {
-        console.error('Commission push failed:', error)
+    if (body?.action === 'assign') {
+      const price = Number(body?.priceGhs)
+      const agentId = Number(body?.assignedTo)
+      if (!Number.isFinite(price) || price <= 0 || price > 1_000_000) {
+        return NextResponse.json({ error: 'Enter the job price in GHS before assigning.' }, { status: 400 })
       }
+      const [agent] = await db
+        .select({ id: users.id, name: users.name })
+        .from(users)
+        .where(and(eq(users.id, agentId), eq(users.status, 'active'), inArray(users.role, CHAT_ROLES)))
+        .limit(1)
+      if (!agent) return NextResponse.json({ error: 'Pick an active agent.' }, { status: 400 })
+
+      const [config] = await db.select({ pct: settings.commissionPercent }).from(settings).where(eq(settings.id, 1)).limit(1)
+      const pct = Number(config?.pct ?? 10)
+      const commission = Math.round(price * pct) / 100
+
+      const [updated] = await db
+        .update(submissions)
+        .set({
+          assignedTo: agent.id,
+          assignedAt: new Date(),
+          status: 'Assigned',
+          priceGhs: price.toFixed(2),
+          commissionGhs: commission.toFixed(2),
+          referralCommissionGhs: existing.referredBy ? commission.toFixed(2) : null,
+        })
+        .where(eq(submissions.id, id))
+        .returning()
+
+      sendPush(
+        { userIds: [agent.id] },
+        { title: `New assignment ${existing.ticketId}`, body: `${existing.serviceType} · price GHS ${price.toFixed(2)} · your commission GHS ${commission.toFixed(2)}`, url: '/agent/dashboard' }
+      ).catch((e) => console.error('Assign push failed:', e))
+
+      return NextResponse.json({ ...updated, assigneeName: agent.name })
     }
 
-    return NextResponse.json(updated)
+    if (body?.action === 'paid') {
+      if (!existing.assignedTo || !existing.priceGhs) {
+        return NextResponse.json({ error: 'Assign the job to an agent with a price first.' }, { status: 400 })
+      }
+      const [updated] = await db
+        .update(submissions)
+        .set({ status: 'Paid', paidAt: new Date() })
+        .where(eq(submissions.id, id))
+        .returning()
+
+      const notify = [existing.assignedTo, existing.referredBy].filter((v): v is number => !!v)
+      sendPush(
+        { userIds: notify },
+        { title: `Commission earned on ${existing.ticketId}`, body: `GHS ${Number(existing.commissionGhs).toFixed(2)} is now in your earnings.`, url: '/agent/dashboard' }
+      ).catch((e) => console.error('Paid push failed:', e))
+
+      return NextResponse.json(updated)
+    }
+
+    return NextResponse.json({ error: 'Unknown action.' }, { status: 400 })
   } catch (error) {
-    console.error('Mark paid failed:', error)
+    console.error('Submission update failed:', error)
     return NextResponse.json({ error: 'Could not update the brief.' }, { status: 500 })
   }
 }

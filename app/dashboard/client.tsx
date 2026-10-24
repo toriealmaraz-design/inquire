@@ -90,6 +90,8 @@ type IntakeRow = {
   createdAt: string | null
   referredBy: number | null
   referrerName: string | null
+  assignedTo: number | null
+  assigneeName: string | null
   priceGhs: string | null
   commissionGhs: string | null
   paidAt: string | null
@@ -143,6 +145,8 @@ export function DashboardClient({ user }: { user: User }) {
   const [settingsError, setSettingsError] = useState('')
   const [priceDraft, setPriceDraft] = useState<Record<number, string>>({})
   const [payingId, setPayingId] = useState<number | null>(null)
+  const [staff, setStaff] = useState<{ id: number; name: string; role: string | null; field: string | null }[]>([])
+  const [agentDraft, setAgentDraft] = useState<Record<number, string>>({})
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
   const [notifEnabled, setNotifEnabled] = useState(false)
@@ -282,20 +286,24 @@ export function DashboardClient({ user }: { user: User }) {
     }
   }
 
-  const markPaid = async (id: number) => {
+  useEffect(() => {
+    fetch('/api/staff').then((r) => (r.ok ? r.json() : [])).then((rows) => setStaff(Array.isArray(rows) ? rows : [])).catch(() => {})
+  }, [])
+
+  const updateBrief = async (id: number, payload: Record<string, unknown>) => {
     setPayingId(id)
     setPayError((e) => ({ ...e, [id]: '' }))
     try {
       const res = await fetch('/api/submissions', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, priceGhs: Number(priceDraft[id]) }),
+        body: JSON.stringify({ id, ...payload }),
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data.error || 'Could not mark as paid.')
-      setIntake((rows) => rows.map((r) => (r.id === id ? { ...r, status: data.status, priceGhs: data.priceGhs, commissionGhs: data.commissionGhs, paidAt: data.paidAt } : r)))
+      if (!res.ok) throw new Error(data.error || 'Could not update the brief.')
+      setIntake((rows) => rows.map((r) => (r.id === id ? { ...r, ...data, assigneeName: data.assigneeName ?? r.assigneeName } : r)))
     } catch (caught) {
-      setPayError((e) => ({ ...e, [id]: caught instanceof Error ? caught.message : 'Could not mark as paid.' }))
+      setPayError((e) => ({ ...e, [id]: caught instanceof Error ? caught.message : 'Could not update the brief.' }))
     } finally {
       setPayingId(null)
     }
@@ -683,28 +691,55 @@ export function DashboardClient({ user }: { user: User }) {
                         </span>
                         {s.paidAt ? (
                           <span className="ml-auto text-emerald-300">
-                            Paid GHS {Number(s.priceGhs).toFixed(2)}{s.commissionGhs ? ` · commission GHS ${Number(s.commissionGhs).toFixed(2)}` : ''}
+                            Paid · {s.assigneeName || 'Agent'} · GHS {Number(s.priceGhs).toFixed(2)} · commission GHS {Number(s.commissionGhs || 0).toFixed(2)}
                           </span>
                         ) : (
-                          <span className="ml-auto flex items-center gap-2">
+                          <span className="ml-auto flex flex-wrap items-center gap-2">
+                            {s.assigneeName && (
+                              <span className="text-cyan-200">Assigned: <strong>{s.assigneeName}</strong> · GHS {Number(s.priceGhs).toFixed(2)}</span>
+                            )}
+                            <select
+                              value={agentDraft[s.id] ?? (s.assignedTo ? String(s.assignedTo) : '')}
+                              onChange={(e) => setAgentDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                              aria-label={`Assign ${s.ticketId} to`}
+                              className="h-9 rounded-lg border border-white/10 bg-white/10 px-2 text-white"
+                            >
+                              <option value="" className="bg-slate-900">Assign to…</option>
+                              {staff.map((a) => (
+                                <option key={a.id} value={a.id} className="bg-slate-900">{a.name}{a.field ? ` · ${a.field}` : ''}</option>
+                              ))}
+                            </select>
                             <input
                               type="number"
                               min="0"
                               step="0.01"
                               inputMode="decimal"
                               placeholder="Price GHS"
-                              value={priceDraft[s.id] ?? ''}
+                              value={priceDraft[s.id] ?? (s.priceGhs ? String(Number(s.priceGhs)) : '')}
                               onChange={(e) => setPriceDraft((d) => ({ ...d, [s.id]: e.target.value }))}
                               aria-label={`Job price for ${s.ticketId}`}
                               className="h-9 w-28 rounded-lg border border-white/10 bg-white/10 px-2 text-white outline-none focus:border-cyan-500/50"
                             />
                             <button
-                              onClick={() => markPaid(s.id)}
-                              disabled={payingId === s.id || !priceDraft[s.id]}
-                              className="h-9 rounded-lg bg-emerald-500/20 px-3 font-bold text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
+                              onClick={() => updateBrief(s.id, {
+                                action: 'assign',
+                                assignedTo: Number(agentDraft[s.id] ?? s.assignedTo),
+                                priceGhs: Number(priceDraft[s.id] ?? s.priceGhs),
+                              })}
+                              disabled={payingId === s.id || !(agentDraft[s.id] ?? s.assignedTo) || !(priceDraft[s.id] ?? s.priceGhs)}
+                              className="h-9 rounded-lg bg-cyan-500/20 px-3 font-bold text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
                             >
-                              {payingId === s.id ? 'Saving…' : 'Mark paid'}
+                              {s.assignedTo ? 'Update' : 'Assign'}
                             </button>
+                            {s.assignedTo && (
+                              <button
+                                onClick={() => window.confirm(`Mark ${s.ticketId} as paid? Commission becomes earned and the job is locked.`) && updateBrief(s.id, { action: 'paid' })}
+                                disabled={payingId === s.id}
+                                className="h-9 rounded-lg bg-emerald-500/20 px-3 font-bold text-emerald-300 hover:bg-emerald-500/30 disabled:opacity-50"
+                              >
+                                Mark paid
+                              </button>
+                            )}
                           </span>
                         )}
                       </div>
