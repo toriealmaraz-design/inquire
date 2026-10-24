@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { MessageCircle, LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
+import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { Announcements } from '@/components/announcements'
 
@@ -43,13 +43,6 @@ type Earnings = {
   }[]
 }
 
-type DbMsg = {
-  id: number
-  conversation_id: number
-  sender_type: string
-  read: boolean | null
-}
-
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 
 
@@ -57,8 +50,7 @@ const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/2
 export function AgentDashboardClient({ user }: { user: User }) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
-  const [convoCount, setConvoCount] = useState(0)
-  const [unread, setUnread] = useState(0)
+  const unread = 0
   const [notifEnabled, setNotifEnabled] = useState(false)
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
@@ -71,16 +63,8 @@ export function AgentDashboardClient({ user }: { user: User }) {
     router.refresh()
   }
 
-  const load = useCallback(async () => {
-    const { count } = await supabase.from('conversations').select('id', { count: 'exact', head: true })
-    setConvoCount(count || 0)
-    const { data: msgs } = await supabase
-      .from('messages')
-      .select('id, conversation_id, sender_type, read')
-      .eq('sender_type', 'client')
-      .eq('read', false)
-    setUnread(((msgs as DbMsg[] | null) || []).length)
-  }, [supabase])
+  // Agents don't handle client chat (admins only), so there is nothing to load here
+  const load = useCallback(async () => {}, [])
 
   useEffect(() => {
     setOrigin(window.location.origin)
@@ -191,9 +175,9 @@ export function AgentDashboardClient({ user }: { user: User }) {
         {/* Stats */}
         <div className="mt-6 grid gap-4 sm:grid-cols-3">
           {[
-            ['Conversations', convoCount, MessageCircle, 'text-blue-400'],
-            ['Unread', unread, Bell, 'text-rose-400'],
             ['Assignments', earnings?.assignedCount ?? 0, FileText, 'text-violet-400'],
+            ['Pending', `GHS ${(earnings?.pendingEarnings ?? 0).toFixed(2)}`, Bell, 'text-amber-300'],
+            ['Earned', `GHS ${(earnings?.totalEarned ?? 0).toFixed(2)}`, Wallet, 'text-emerald-300'],
           ].map(([label, value, Icon, color]: any) => (
             <div key={label} className={`${glass} rounded-2xl p-5`}>
               <div className="flex items-center justify-between">
@@ -205,13 +189,6 @@ export function AgentDashboardClient({ user }: { user: User }) {
           ))}
         </div>
 
-        {/* Open chat CTA */}
-        <a
-          href="/agent/chat"
-          className="mt-6 flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 px-5 py-4 text-sm font-bold text-white hover:from-cyan-400 hover:to-blue-500"
-        >
-          <MessageCircle className="size-5" /> Open Live Chat Console
-        </a>
 
         {/* Referral link + commission */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>

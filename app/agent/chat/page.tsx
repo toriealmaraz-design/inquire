@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getPageUser, canChat } from '@/lib/auth'
+import { getPageUser, isAdmin } from '@/lib/auth'
 import { AgentChatClient } from './client'
 
 // Signed-in pages read cookies; never prerender them.
@@ -18,8 +18,9 @@ export default async function AgentChatPage() {
     redirect('/dashboard')
   }
 
-  if (!canChat(role)) {
-    redirect('/dashboard')
+  // Only admins chat with clients; agents work from their portal
+  if (!isAdmin(role)) {
+    redirect('/agent/dashboard')
   }
 
   return <AgentChatClient user={{
