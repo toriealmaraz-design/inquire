@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
+import { SupportPresence } from '@/components/support-presence'
 import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, Bell, BellOff } from 'lucide-react'
 
 type User = {
@@ -300,6 +301,7 @@ export function AgentChatClient({ user }: { user: User }) {
         </div>
 
         <PushPrompt compact />
+        <SupportPresence userId={String(user.id)} />
 
         <div className="flex-1 overflow-y-auto">
           {conversations.length === 0 && (

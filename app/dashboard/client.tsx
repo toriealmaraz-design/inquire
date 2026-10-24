@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
+import { SupportPresence } from '@/components/support-presence'
 import { Announcements } from '@/components/announcements'
 import { FIELDS } from '@/lib/fields'
 import {
@@ -494,6 +495,7 @@ export function DashboardClient({ user }: { user: User }) {
           </div>
 
           <div className="mt-6"><PushPrompt /></div>
+        {['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist'].includes(user.role || '') && <SupportPresence userId={String(user.id ?? user.email)} />}
 
           {/* Overview Tab */}
           {tab === 'Overview' && (
