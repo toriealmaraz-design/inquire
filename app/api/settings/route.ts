@@ -44,6 +44,8 @@ export async function PATCH(request: Request) {
     if (typeof body.instagram === 'string') values.instagramUsername = clean(body.instagram, 50).replace(/^@/, '')
     if (typeof body.snapchat === 'string') values.snapchatUsername = clean(body.snapchat, 50).replace(/^@/, '')
     if (typeof body.email === 'string') values.contactEmail = clean(body.email, 120)
+    if (typeof body.logoUrl === 'string') values.logoUrl = clean(body.logoUrl, 1000)
+    if (typeof body.faviconUrl === 'string') values.faviconUrl = clean(body.faviconUrl, 1000)
     if (body.commissionPercent !== undefined) {
       const pct = Number(body.commissionPercent)
       if (!Number.isFinite(pct) || pct < 0 || pct > 100) {

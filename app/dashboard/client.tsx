@@ -9,6 +9,7 @@ import { SupportPresence } from '@/components/support-presence'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { ChatbotSettings } from '@/components/chatbot-settings'
+  import { AssetManager } from '@/components/asset-manager'
 import { RoleWatcher } from '@/components/role-watcher'
 import { ProfileCard } from '@/components/profile-card'
 import { AnalyticsBoard } from '@/components/analytics-board'
@@ -1068,6 +1069,8 @@ export function DashboardClient({ user }: { user: User }) {
                     ))}
                   </div>
                 </div>
+
+                <AssetManager />
 
                 <button
                   onClick={saveSettings}

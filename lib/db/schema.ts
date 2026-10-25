@@ -35,6 +35,8 @@ export const settings = pgTable('settings', {
   commissionPercent: numeric('commission_percent', { precision: 5, scale: 2 }).default('10'),
   vapidPublicKey: text('vapid_public_key'),
   vapidPrivateKey: text('vapid_private_key'),
+  logoUrl: text('logo_url'),
+  faviconUrl: text('favicon_url'),
   updatedAt: timestamp('updated_at').defaultNow(),
 })
 
