@@ -28,3 +28,5 @@ export function briefTitle(s: { title?: string | null; briefDetails?: string | n
 // Ticket numbers: AC-2610-001 (Academic), MD-… (Media), IT-… (Systems); older ones GN-1042
 export const TICKET_RE = /\b(?:(?:AC|MD|IT|GN)-?\d{4}-?\d{3}|GN-?\d{3,6})\b/i
 export const normTicket = (t: string) => t.toUpperCase().replace(/-/g, '')
+
+export const COMPLAINT_CATEGORIES = ['Payment / commission', 'Assignment', 'Another staff member', 'Technical problem', 'Client issue', 'Suggestion', 'Other']

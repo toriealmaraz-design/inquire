@@ -13,6 +13,8 @@ import { RoleWatcher } from '@/components/role-watcher'
 import { ProfileCard } from '@/components/profile-card'
 import { AnalyticsBoard } from '@/components/analytics-board'
 import { BriefEditor } from '@/components/brief-editor'
+import { ComplaintsInbox } from '@/components/complaints'
+import { ContactSuperAdmin } from '@/components/contact-super-admin'
 import { superDelete } from '@/lib/admin-delete'
 import { FIELDS, briefTitle } from '@/lib/fields'
 import {
@@ -35,6 +37,7 @@ import {
   ChevronDown,
   Megaphone,
   Trophy,
+  MessageSquareWarning,
   Percent,
 } from 'lucide-react'
 
@@ -134,6 +137,10 @@ const ROLES = [
 
 export function DashboardClient({ user }: { user: User }) {
   const [tab, setTab] = useState('Overview')
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get('tab')
+    if (t) setTab(t)
+  }, [])
   const [users, setUsers] = useState<DBUser[]>([])
   const [loading, setLoading] = useState(true)
   const [settingsLoading, setSettingsLoading] = useState(false)
@@ -142,6 +149,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [uploads, setUploads] = useState<UploadRow[]>([])
   const [intake, setIntake] = useState<IntakeRow[]>([])
   const [commissionPercent, setCommissionPercent] = useState('')
+  const [handles, setHandles] = useState({ whatsapp: '', telegram: '', instagram: '', snapchat: '', email: '' })
   const [settingsError, setSettingsError] = useState('')
   const [priceDraft, setPriceDraft] = useState<Record<number, string>>({})
   const [payingId, setPayingId] = useState<number | null>(null)
@@ -232,9 +240,9 @@ export function DashboardClient({ user }: { user: User }) {
   
   // Navigation based on role
   const nav = isSuperAdmin
-    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Leaderboard', 'Announcements', 'Settings']
+    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Complaints', 'Leaderboard', 'Announcements', 'Settings']
     : isSubAdmin
-    ? ['Overview', 'Submissions', 'Chats', 'Leaderboard', 'Announcements']
+    ? ['Overview', 'Submissions', 'Chats', 'Complaints', 'Leaderboard', 'Announcements']
     : ['Overview', 'Chats']
 
   useEffect(() => {
@@ -243,12 +251,13 @@ export function DashboardClient({ user }: { user: User }) {
         // Load everything in parallel instead of one request after another
         const [usersData, settingsData, intakeData] = await Promise.all([
           isSuperAdmin ? fetch('/api/admin/users').then((r) => r.json()).catch(() => []) : Promise.resolve([]),
-          fetch(isSuperAdmin ? '/api/settings?scope=admin' : '/api/settings').then((r) => r.json()).catch(() => ({})),
+          isSuperAdmin ? fetch('/api/settings?scope=admin').then((r) => r.json()).catch(() => ({})) : Promise.resolve({}),
           fetch('/api/submissions').then((r) => (r.ok ? r.json() : [])).catch(() => []),
         ])
         setUsers(Array.isArray(usersData) ? usersData : [])
         setIntake(Array.isArray(intakeData) ? intakeData : [])
         if (settingsData.commissionPercent !== undefined) setCommissionPercent(String(settingsData.commissionPercent))
+        if (isSuperAdmin) setHandles({ whatsapp: settingsData.whatsapp || '', telegram: settingsData.telegram || '', instagram: settingsData.instagram || '', snapchat: settingsData.snapchat || '', email: settingsData.email || '' })
       } catch (error) {
         console.error('Error fetching data:', error)
       } finally {
@@ -301,7 +310,7 @@ export function DashboardClient({ user }: { user: User }) {
       const res = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ commissionPercent: commissionPercent === '' ? undefined : Number(commissionPercent) }),
+        body: JSON.stringify({ ...handles, commissionPercent: commissionPercent === '' ? undefined : Number(commissionPercent) }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
@@ -421,6 +430,7 @@ export function DashboardClient({ user }: { user: User }) {
                 {item === 'Settings' && <Settings2 className="size-4" />}
                 {item === 'Announcements' && <Megaphone className="size-4" />}
                 {item === 'Leaderboard' && <Trophy className="size-4" />}
+                {item === 'Complaints' && <MessageSquareWarning className="size-4" />}
                 {item}
                 {item === 'User Management' && pendingCount > 0 && (
                   <span className="ml-auto rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] text-amber-300">
@@ -987,6 +997,14 @@ export function DashboardClient({ user }: { user: User }) {
 
           {tab === 'Leaderboard' && <div className="mt-8"><Leaderboard /></div>}
 
+          {tab === 'Complaints' && (
+            <div className="mt-8 flex flex-col gap-5">
+              {!isSuperAdmin && <ContactSuperAdmin />}
+              <ComplaintsInbox isSuperAdmin={isSuperAdmin} />
+              <a href="/complaints" className="text-xs text-cyan-300 hover:underline">Need to raise a complaint yourself? Open the complaint form →</a>
+            </div>
+          )}
+
           {/* Announcements Tab */}
           {tab === 'Announcements' && (
             <div className="mt-8"><Announcements role={user.role} field={user.field} /></div>
@@ -1025,6 +1043,30 @@ export function DashboardClient({ user }: { user: User }) {
                     className="w-full h-11 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white placeholder:text-slate-600 outline-none focus:border-cyan-500/50"
                   />
                   <p className="mt-2 text-[11px] text-slate-500">Agents earn this % of the job price when a brief from their link is marked paid.</p>
+                </div>
+
+                <div className="mt-8 border-t border-white/10 pt-6">
+                  <h3 className="font-semibold">Your contact handles</h3>
+                  <p className="mt-1 text-xs text-slate-500">Shown to admins (never to clients or agents) so they can reach you directly.</p>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    {([
+                      ['whatsapp', 'WhatsApp number', '233206478727'],
+                      ['telegram', 'Telegram username', 'GeminiNexusAdmin'],
+                      ['instagram', 'Instagram username', 'yourhandle'],
+                      ['snapchat', 'Snapchat username', 'yourhandle'],
+                      ['email', 'Email', 'you@gmail.com'],
+                    ] as const).map(([k, label, ph]) => (
+                      <label key={k} className="text-xs text-slate-400">
+                        {label}
+                        <input
+                          value={handles[k]}
+                          onChange={(e) => setHandles((h) => ({ ...h, [k]: e.target.value }))}
+                          placeholder={ph}
+                          className="mt-1.5 h-11 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
+                        />
+                      </label>
+                    ))}
+                  </div>
                 </div>
 
                 <button

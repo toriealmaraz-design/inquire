@@ -24,6 +24,7 @@ export const settings = pgTable('settings', {
   telegramUsername: varchar('telegram_username', { length: 50 }).default('GeminiNexusAdmin'),
   instagramUsername: varchar('instagram_username', { length: 50 }).default('GeminiNexusAdmin'),
   snapchatUsername: varchar('snapchat_username', { length: 50 }).default('GeminiNexus'),
+  contactEmail: varchar('contact_email', { length: 120 }),
   telegramBotToken: text('telegram_bot_token').default(''),
   telegramChatId: varchar('telegram_chat_id', { length: 50 }).default(''),
   fileRetentionDays: integer('file_retention_days').notNull().default(7),
@@ -162,4 +163,19 @@ export const notifications = pgTable('notifications', {
   tag: varchar('tag', { length: 80 }),
   read: boolean('read').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// Staff complaints to admins
+export const complaints = pgTable('complaints', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').references(() => users.id, { onDelete: 'set null' }),
+  category: varchar('category', { length: 40 }).notNull().default('Other'),
+  subject: varchar('subject', { length: 150 }).notNull(),
+  body: text('body').notNull(),
+  anonymous: boolean('anonymous').notNull().default(false),
+  status: varchar('status', { length: 20 }).notNull().default('Open'),
+  response: text('response'),
+  respondedBy: integer('responded_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })

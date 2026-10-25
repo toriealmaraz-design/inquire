@@ -257,9 +257,9 @@ export function AgentChatClient({ user }: { user: User }) {
   const activeConvoData = conversations.find((c) => c.id === activeConvo)
 
   return (
-    <main className="flex h-screen bg-[#06121d]">
+    <main className="flex h-[100dvh] overflow-hidden bg-[#06121d]">
       {/* Sidebar - conversation list */}
-      <aside className="w-80 border-r border-white/10 bg-[#0a1929] flex flex-col">
+      <aside className={`${activeConvo ? 'hidden lg:flex' : 'flex'} w-full shrink-0 flex-col border-r border-white/10 bg-[#0a1929] lg:w-80`}>
         <div className="p-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             {user.image ? (
@@ -332,10 +332,10 @@ export function AgentChatClient({ user }: { user: User }) {
 
       {/* Chat area */}
       {activeConvo ? (
-        <div className="flex-1 flex flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           {/* Chat header */}
           <header className="px-4 py-3 border-b border-white/10 bg-[#0a1929] flex items-center gap-3">
-            <button onClick={() => setActiveConvo(null)} className="lg:hidden text-slate-400">
+            <button onClick={() => setActiveConvo(null)} aria-label="Back to conversations" className="-ml-1 rounded-full p-1 text-slate-400 hover:bg-white/10 lg:hidden">
               <ArrowLeft className="size-5" />
             </button>
             <div className="size-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold">
@@ -360,7 +360,7 @@ export function AgentChatClient({ user }: { user: User }) {
                   className={`flex ${m.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`relative max-w-[80%] rounded-lg px-3 py-2 shadow-md ${
+                    className={`relative max-w-[85%] break-words sm:max-w-[70%] rounded-lg px-3 py-2 shadow-md ${
                       m.sender === 'agent'
                         ? 'bg-[#0c5f4a] text-white rounded-tr-none'
                         : 'bg-[#0f2847] text-slate-100 rounded-tl-none'
@@ -388,7 +388,7 @@ export function AgentChatClient({ user }: { user: User }) {
           </div>
 
           {/* Input */}
-          <div className="border-t border-white/10 bg-[#0a1929] px-3 py-2">
+          <div className="border-t border-white/10 bg-[#0a1929] px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
             <div className="flex items-end gap-2 max-w-2xl mx-auto">
               {isAdminUser && <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-slate-400 hover:text-cyan-300 disabled:opacity-50">
                 <Paperclip className="size-5" />
@@ -416,7 +416,7 @@ export function AgentChatClient({ user }: { user: User }) {
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex items-center justify-center text-slate-500">
+        <div className="hidden flex-1 items-center justify-center text-slate-500 lg:flex">
           <div className="text-center">
             <Users className="size-16 mx-auto mb-4 opacity-50" />
             <p>Select a conversation to start chatting</p>

@@ -2,7 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 
-export type DeleteKind = 'brief' | 'conversation' | 'message' | 'upload' | 'user' | 'announcement'
+export type DeleteKind = 'brief' | 'conversation' | 'message' | 'upload' | 'user' | 'announcement' | 'complaint'
 
 /**
  * Super admin: permanently delete records (after a confirm prompt), then remove any

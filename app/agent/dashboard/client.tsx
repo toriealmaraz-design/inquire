@@ -131,18 +131,18 @@ export function AgentDashboardClient({ user }: { user: User }) {
                 {user.name?.[0] || 'A'}
               </div>
             )}
-            <div>
-              <p className="text-sm font-bold">{user.name}</p>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-bold">{user.name}</p>
               <p className="text-[10px] uppercase tracking-wider text-cyan-300">{user.role?.replace(/_/g, ' ')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/help" className="flex h-11 items-center gap-2 rounded-2xl px-3 text-xs text-slate-400 hover:text-white">
-              <BookOpen className="size-4" /> Help
+            <a href="/help" aria-label="Help" className="flex h-11 items-center gap-2 rounded-2xl px-3 text-xs text-slate-400 hover:text-white">
+              <BookOpen className="size-4" /> <span className="hidden sm:inline">Help</span>
             </a>
             <NotificationBell />
-            <button onClick={handleSignOut} className="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs text-slate-400 hover:text-white">
-              <LogOut className="size-4" /> Sign out
+            <button onClick={handleSignOut} aria-label="Sign out" className="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs text-slate-400 hover:text-white">
+              <LogOut className="size-4" /> <span className="hidden sm:inline">Sign out</span>
             </button>
           </div>
         </div>
@@ -151,7 +151,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
         <div className="mt-6"><PushPrompt showTest /></div>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
-        <a href="/onboarding" className="mt-1 inline-block text-xs text-cyan-300 hover:underline">Edit my skills profile →</a>
+        <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
+          <a href="/onboarding" className="text-cyan-300 hover:underline">Edit my skills profile →</a>
+          <a href="/complaints" className="text-amber-300 hover:underline">Lodge a complaint →</a>
+        </div>
         <p className="mt-1 text-sm text-slate-400">Your assignments, referral link and commission.</p>
 
         {/* Stats */}

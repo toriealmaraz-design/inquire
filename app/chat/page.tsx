@@ -219,16 +219,17 @@ export default function ChatPage() {
     return id
   }, [convoId, profile, supabase])
 
-  const postMessage = async (content: string, tmpId?: string) => {
-    if (!supabase) return false
+  // Returns the conversation id on success, or null
+  const postMessage = async (content: string, tmpId?: string): Promise<number | null> => {
+    if (!supabase) return null
     const id = await ensureConversation()
-    if (!id) return false
+    if (!id) return null
     const { data, error } = await supabase
       .from('messages')
       .insert({ conversation_id: id, sender_type: 'client', content, read: false })
       .select('*')
       .single()
-    if (error || !data) return false
+    if (error || !data) return null
     const r = data as DbMessage
     setMessages((prev) => {
       const rest = prev.filter((m) => m.id !== tmpId)
@@ -237,7 +238,7 @@ export default function ChatPage() {
     supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id).then(() => {})
     // Push-alert the admins (server throttles this per conversation)
     fetch('/api/chat/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: id }), keepalive: true }).catch(() => {})
-    return true
+    return id
   }
 
   const send = async (preset?: string) => {
@@ -250,10 +251,10 @@ export default function ChatPage() {
     const tmpId = `tmp-${Date.now()}`
     setMessages((prev) => [...prev, { id: tmpId, text, sender: 'user', createdAt: new Date().toISOString(), pending: true }])
     const ok = await postMessage(text, tmpId)
-    if (ok && online === false && botCfg.away && convoId !== null && supabase) {
+    if (ok && online === false && botCfg.away && supabase) {
       const recentAway = messages.some((m) => m.bot && m.text === botCfg.away && Date.now() - Date.parse(m.createdAt) < 30 * 60_000)
       if (!recentAway) {
-        await supabase.from('messages').insert({ conversation_id: convoId, sender_type: 'bot', content: botCfg.away, read: true })
+        await supabase.from('messages').insert({ conversation_id: ok, sender_type: 'bot', content: botCfg.away, read: true })
       }
     }
     if (!ok) {

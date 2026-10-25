@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { announcements, conversations, messages, pushSubscriptions, submissions, uploads, users } from '@/lib/db/schema'
+import { announcements, complaints, conversations, messages, pushSubscriptions, submissions, uploads, users } from '@/lib/db/schema'
 import { getStaffUser } from '@/lib/auth'
 
 export const runtime = 'nodejs'
 
-type Kind = 'brief' | 'conversation' | 'message' | 'upload' | 'user' | 'announcement'
-const KINDS: Kind[] = ['brief', 'conversation', 'message', 'upload', 'user', 'announcement']
+type Kind = 'brief' | 'conversation' | 'message' | 'upload' | 'user' | 'announcement' | 'complaint'
+const KINDS: Kind[] = ['brief', 'conversation', 'message', 'upload', 'user', 'announcement', 'complaint']
 
 /**
  * Super admin only: permanently delete records.
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         await tx.delete(uploads).where(inArray(uploads.id, ids))
       }
       if (type === 'announcement') await tx.delete(announcements).where(inArray(announcements.id, ids))
+      if (type === 'complaint') await tx.delete(complaints).where(inArray(complaints.id, ids))
       if (type === 'user') {
         if (ids.includes(me.id)) throw new Error('self')
         // Keep briefs/history but unlink the person, then remove them
