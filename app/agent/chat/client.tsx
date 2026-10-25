@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
 import { SupportPresence } from '@/components/support-presence'
 import { RoleWatcher } from '@/components/role-watcher'
+import { superDelete } from '@/lib/admin-delete'
 import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, Bell, BellOff } from 'lucide-react'
 
 type User = {
@@ -304,7 +305,7 @@ export function AgentChatClient({ user }: { user: User }) {
         </div>
 
         <PushPrompt compact />
-        <SupportPresence userId={String(user.id)} />
+        <SupportPresence userId={String(user.id)} showVisitors />
         <RoleWatcher role={user.role} field={user.field} />
 
         <div className="flex-1 overflow-y-auto">
@@ -395,6 +396,13 @@ export function AgentChatClient({ user }: { user: User }) {
                       <span className="text-[10px] text-slate-400">{m.time}</span>
                       {m.sender === 'agent' && (
                         <CheckCheck className={`size-4 ${m.read ? 'text-cyan-400' : 'text-slate-500'}`} />
+                      )}
+                      {user.role === 'super_admin' && typeof m.id === 'number' && (
+                        <button
+                          onClick={async () => { if (await superDelete('message', [m.id as number], 'Delete this message for everyone?')) setMessages((list) => list.filter((x) => x.id !== m.id)) }}
+                          className="ml-1 text-[10px] text-slate-500 hover:text-rose-300"
+                          aria-label="Delete message"
+                        >Delete</button>
                       )}
                     </div>
                   </div>

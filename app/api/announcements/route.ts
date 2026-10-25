@@ -77,3 +77,16 @@ export async function POST(request: Request) {
 
   return NextResponse.json({ announcement: { ...created, author: user.name }, sent }, { status: 201 })
 }
+
+// Super admin: edit any announcement
+export async function PATCH(request: Request) {
+  const user = await getStaffUser()
+  if (!user || user.role !== 'super_admin') return NextResponse.json({ error: 'Only the super admin can edit announcements.' }, { status: 403 })
+  const body = await request.json().catch(() => null)
+  const id = Number(body?.id)
+  const title = typeof body?.title === 'string' ? body.title.trim().slice(0, 120) : ''
+  const text = typeof body?.body === 'string' ? body.body.trim().slice(0, 2000) : ''
+  if (!Number.isInteger(id) || !title || !text) return NextResponse.json({ error: 'Add a title and a message.' }, { status: 400 })
+  const [updated] = await db.update(announcements).set({ title, body: text }).where(eq(announcements.id, id)).returning()
+  return updated ? NextResponse.json(updated) : NextResponse.json({ error: 'Not found.' }, { status: 404 })
+}

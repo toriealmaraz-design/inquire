@@ -14,12 +14,12 @@ export async function GET(request: Request) {
   try {
     const [rows, [cfg]] = await Promise.all([
       db.select().from(chatbotReplies).orderBy(asc(chatbotReplies.sort), asc(chatbotReplies.id)),
-      db.select({ greeting: settings.chatGreeting, autoReplyEnabled: settings.autoReplyEnabled }).from(settings).where(eq(settings.id, 1)).limit(1),
+      db.select({ greeting: settings.chatGreeting, awayMessage: settings.chatAwayMessage, autoReplyEnabled: settings.autoReplyEnabled }).from(settings).where(eq(settings.id, 1)).limit(1),
     ])
     const replies = (admin ? rows : rows.filter((r) => r.enabled)).map((r) => ({
       id: r.id, question: r.question, keywords: r.keywords, reply: r.reply, enabled: r.enabled,
     }))
-    return NextResponse.json({ greeting: cfg?.greeting ?? '', autoReplyEnabled: cfg?.autoReplyEnabled ?? true, replies })
+    return NextResponse.json({ greeting: cfg?.greeting ?? '', awayMessage: cfg?.awayMessage ?? '', autoReplyEnabled: cfg?.autoReplyEnabled ?? true, replies })
   } catch (error) {
     console.error('Chatbot GET failed:', error)
     return NextResponse.json({ greeting: '', autoReplyEnabled: false, replies: [] })
@@ -51,7 +51,7 @@ export async function PUT(request: Request) {
     await db.transaction(async (tx) => {
       await tx
         .update(settings)
-        .set({ chatGreeting: clean(body.greeting, 600), autoReplyEnabled: body.autoReplyEnabled !== false, updatedAt: new Date() })
+        .set({ chatGreeting: clean(body.greeting, 600), ...(typeof body.awayMessage === 'string' ? { chatAwayMessage: clean(body.awayMessage, 600) } : {}), autoReplyEnabled: body.autoReplyEnabled !== false, updatedAt: new Date() })
         .where(eq(settings.id, 1))
       await tx.delete(chatbotReplies)
       if (replies.length) await tx.insert(chatbotReplies).values(replies)

@@ -120,15 +120,45 @@ export default function ChatPage() {
   // Real "online": is any admin on the chat console or dashboard right now?
   useEffect(() => {
     if (!supabase) return
-    const channel = supabase.channel(PRESENCE_CHANNEL)
+    // Also announce this visitor so admins see "visitors on Live Chat" in their console
+    const visitorKey = `visitor-${Math.random().toString(36).slice(2, 10)}`
+    const channel = supabase.channel(PRESENCE_CHANNEL, { config: { presence: { key: visitorKey } } })
     const update = () => setOnline(Object.keys(channel.presenceState()).some((k) => k.startsWith('staff-')))
     channel.on('presence', { event: 'sync' }, update).subscribe((status) => {
-      if (status === 'SUBSCRIBED') setTimeout(update, 1500)
+      if (status === 'SUBSCRIBED') {
+        channel.track({ visitor: true, at: Date.now() })
+        setTimeout(update, 1500)
+      }
     })
     return () => {
       supabase.removeChannel(channel)
     }
   }, [supabase])
+
+  // Greeting + away message from the admin's chatbot settings
+  const [botCfg, setBotCfg] = useState<{ greeting: string; away: string }>({ greeting: '', away: '' })
+  useEffect(() => {
+    fetch('/api/chatbot')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => d && setBotCfg({ greeting: d.greeting || '', away: d.awayMessage || '' }))
+      .catch(() => {})
+    // Tell admins a possible client is here (once per browser session)
+    if (!sessionStorage.getItem('nexus_visit_alerted')) {
+      sessionStorage.setItem('nexus_visit_alerted', '1')
+      const returning = !!JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}')?.convoId
+      fetch('/api/chat/visit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ returning }) }).catch(() => {})
+    }
+  }, [])
+
+  // While the client's latest message has no admin reply, keep nudging the admins
+  // (the server sends at most one reminder every 3 minutes, for up to an hour)
+  const lastSender = messages.filter((m) => !m.bot).at(-1)?.sender
+  useEffect(() => {
+    if (!convoId || lastSender !== 'user') return
+    const ping = () => fetch('/api/chat/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: convoId }) }).catch(() => {})
+    const t = setInterval(ping, 60_000)
+    return () => clearInterval(t)
+  }, [convoId, lastSender])
 
   // History + realtime (new messages and read receipts)
   useEffect(() => {
@@ -220,6 +250,12 @@ export default function ChatPage() {
     const tmpId = `tmp-${Date.now()}`
     setMessages((prev) => [...prev, { id: tmpId, text, sender: 'user', createdAt: new Date().toISOString(), pending: true }])
     const ok = await postMessage(text, tmpId)
+    if (ok && online === false && botCfg.away && convoId !== null && supabase) {
+      const recentAway = messages.some((m) => m.bot && m.text === botCfg.away && Date.now() - Date.parse(m.createdAt) < 30 * 60_000)
+      if (!recentAway) {
+        await supabase.from('messages').insert({ conversation_id: convoId, sender_type: 'bot', content: botCfg.away, read: true })
+      }
+    }
     if (!ok) {
       setMessages((prev) => prev.filter((m) => m.id !== tmpId))
       setInput(text)
@@ -338,6 +374,21 @@ export default function ChatPage() {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto flex max-w-3xl flex-col gap-2">
+          {messages.length === 0 && (
+            <div className="flex justify-start">
+              <div className="max-w-[85%] rounded-2xl rounded-bl-md bg-[#0f2847] px-3 py-2 shadow-md sm:max-w-[70%]">
+                <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">Nexus Assistant</p>
+                <p className="text-sm leading-relaxed">
+                  {(() => {
+                    const h = new Date().getHours()
+                    return h < 12 ? 'Good morning! ' : h < 17 ? 'Good afternoon! ' : 'Good evening! '
+                  })()}
+                  {botCfg.greeting || 'Welcome to Gemini Nexus. Tell us what you need and an admin will reply right here.'}
+                  {online === false && ' Our team is away right now, but leave a message and we will reply here.'}
+                </p>
+              </div>
+            </div>
+          )}
           {messages.length === 0 && (
             <div className="mx-auto mt-6 max-w-md text-center">
               <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/20 to-indigo-500/20 text-xl font-bold text-cyan-200">GN</div>

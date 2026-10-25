@@ -11,6 +11,7 @@ const field = 'w-full rounded-xl border border-white/10 bg-white/5 px-3 text-sm 
 /** Super admin editor for the chatbot + live-chat automatic replies */
 export function ChatbotSettings() {
   const [greeting, setGreeting] = useState('')
+  const [away, setAway] = useState('')
   const [enabled, setEnabled] = useState(true)
   const [items, setItems] = useState<Item[]>([])
   const [loading, setLoading] = useState(true)
@@ -44,6 +45,7 @@ export function ChatbotSettings() {
       .then((d) => {
         if (!d) return
         setGreeting(d.greeting || '')
+        setAway(d.awayMessage || '')
         setEnabled(d.autoReplyEnabled !== false)
         setItems((d.replies || []).map((r: Item) => ({ question: r.question, keywords: r.keywords, reply: r.reply, enabled: r.enabled })))
       })
@@ -68,7 +70,7 @@ export function ChatbotSettings() {
       const res = await fetch('/api/chatbot', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ greeting, autoReplyEnabled: enabled, replies: items }),
+        body: JSON.stringify({ greeting, awayMessage: away, autoReplyEnabled: enabled, replies: items }),
       })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error || 'Could not save.')
@@ -102,6 +104,8 @@ export function ChatbotSettings() {
         <>
           <label className="mt-5 block text-xs font-medium text-slate-400">Greeting (sent automatically on a client's first message)</label>
           <textarea value={greeting} onChange={(e) => setGreeting(e.target.value)} rows={2} maxLength={600} className={`${field} mt-2 py-2`} />
+          <label className="mt-4 block text-xs font-medium text-slate-400">Away message (sent automatically when no admin is online)</label>
+          <textarea value={away} onChange={(e) => setAway(e.target.value)} rows={2} maxLength={600} className={`${field} mt-2 py-2`} />
 
           {misses.length > 0 && (
             <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-4">

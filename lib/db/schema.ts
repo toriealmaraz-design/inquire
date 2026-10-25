@@ -28,6 +28,8 @@ export const settings = pgTable('settings', {
   telegramChatId: varchar('telegram_chat_id', { length: 50 }).default(''),
   fileRetentionDays: integer('file_retention_days').notNull().default(7),
   chatGreeting: text('chat_greeting'),
+  chatAwayMessage: text('chat_away_message'),
+  visitAlertAt: timestamp('visit_alert_at', { withTimezone: true }),
   autoReplyEnabled: boolean('auto_reply_enabled').notNull().default(true),
   commissionPercent: numeric('commission_percent', { precision: 5, scale: 2 }).default('10'),
   vapidPublicKey: text('vapid_public_key'),

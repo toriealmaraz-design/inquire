@@ -153,6 +153,35 @@ export async function PATCH(request: Request) {
       return NextResponse.json(updated)
     }
 
+    // Super admin: change anything on a brief, even after it is paid
+    if (body?.action === 'edit') {
+      if (user.role !== 'super_admin') return NextResponse.json({ error: 'Only the super admin can edit briefs.' }, { status: 403 })
+      const f = body.fields || {}
+      const set: Partial<typeof submissions.$inferInsert> = {}
+      const text = (k: string, n: number) => (typeof f[k] === 'string' ? f[k].trim().slice(0, n) : undefined)
+      if (text('title', 120) !== undefined) set.title = text('title', 120) || null
+      if (text('briefDetails', 4000) !== undefined) set.briefDetails = text('briefDetails', 4000)
+      if (text('clientContact', 50) !== undefined) set.clientContact = text('clientContact', 50)
+      if (text('scope', 50) !== undefined) set.scope = text('scope', 50)
+      if (text('urgency', 50) !== undefined) set.urgency = text('urgency', 50)
+      if (text('status', 30)) set.status = text('status', 30)
+      if (f.priceGhs !== undefined) {
+        const price = Number(f.priceGhs)
+        if (f.priceGhs === '' || f.priceGhs === null) set.priceGhs = null
+        else if (Number.isFinite(price) && price >= 0 && price <= 1_000_000) {
+          set.priceGhs = price.toFixed(2)
+          const [cfg] = await db.select({ pct: settings.commissionPercent }).from(settings).where(eq(settings.id, 1)).limit(1)
+          const c = Math.round(price * Number(cfg?.pct ?? 10)) / 100
+          if (existing.assignedTo) set.commissionGhs = c.toFixed(2)
+          if (existing.referredBy) set.referralCommissionGhs = c.toFixed(2)
+        } else return NextResponse.json({ error: 'Invalid price.' }, { status: 400 })
+      }
+      if (f.unpay === true) set.paidAt = null
+      if (!Object.keys(set).length) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 })
+      const [updated] = await db.update(submissions).set(set).where(eq(submissions.id, id)).returning()
+      return NextResponse.json(updated)
+    }
+
     if (existing.paidAt) return NextResponse.json({ error: 'This job is already paid and locked.' }, { status: 409 })
 
     if (body?.action === 'assign') {

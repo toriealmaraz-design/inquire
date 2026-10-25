@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Megaphone, Send } from 'lucide-react'
 import { FIELDS, fieldLabel } from '@/lib/fields'
+import { superDelete } from '@/lib/admin-delete'
 
 type Announcement = {
   id: number
@@ -143,7 +144,29 @@ export function Announcements({ role, field, limit }: { role?: string | null; fi
                   <span className="rounded-full bg-cyan-300/10 px-2 py-0.5 text-[11px] text-cyan-200">{a.field ? fieldLabel(a.field) : 'All staff'}</span>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-300">{a.body}</p>
-                <p className="mt-2 text-[11px] text-slate-500">{[a.author, when(a.createdAt)].filter(Boolean).join(' · ')}</p>
+                <div className="mt-2 flex items-center gap-3">
+                  <p className="flex-1 text-[11px] text-slate-500">{[a.author, when(a.createdAt)].filter(Boolean).join(' · ')}</p>
+                  {isSuperAdmin && (
+                    <>
+                      <button
+                        onClick={async () => {
+                          const title = window.prompt('Announcement title', a.title)
+                          if (title === null) return
+                          const body = window.prompt('Message', a.body)
+                          if (body === null) return
+                          const res = await fetch('/api/announcements', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: a.id, title, body }) })
+                          if (res.ok) setItems((list) => list.map((x) => (x.id === a.id ? { ...x, title: title.trim(), body: body.trim() } : x)))
+                          else window.alert('Could not save. Title and message are required.')
+                        }}
+                        className="text-[11px] text-slate-400 hover:text-cyan-200"
+                      >Edit</button>
+                      <button
+                        onClick={async () => { if (await superDelete('announcement', [a.id], `Delete the announcement "${a.title}"?`)) setItems((list) => list.filter((x) => x.id !== a.id)) }}
+                        className="text-[11px] text-slate-400 hover:text-rose-300"
+                      >Delete</button>
+                    </>
+                  )}
+                </div>
               </li>
             ))}
           </ul>

@@ -11,6 +11,8 @@ import { ChatbotSettings } from '@/components/chatbot-settings'
 import { RoleWatcher } from '@/components/role-watcher'
 import { ProfileCard } from '@/components/profile-card'
 import { AnalyticsBoard } from '@/components/analytics-board'
+import { BriefEditor } from '@/components/brief-editor'
+import { superDelete } from '@/lib/admin-delete'
 import { FIELDS, briefTitle } from '@/lib/fields'
 import {
   BarChart3,
@@ -27,6 +29,7 @@ import {
   FileText,
   Bell,
   Download,
+  Trash2,
   Pencil,
   ChevronDown,
   Megaphone,
@@ -145,6 +148,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [agentDraft, setAgentDraft] = useState<Record<number, string>>({})
   const [subSearch, setSubSearch] = useState('')
   const [openProfile, setOpenProfile] = useState<number | null>(null)
+  const [editing, setEditing] = useState<number | null>(null)
   const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
@@ -668,6 +672,13 @@ export function DashboardClient({ user }: { user: User }) {
                                   <Check className="size-3" /> Enable
                                 </button>
                               )}
+                              {u.role !== 'super_admin' && (
+                                <button
+                                  onClick={async () => { if (await superDelete('user', [u.id], `Permanently delete ${u.name} (${u.email})? Their briefs stay but are unassigned. If they sign in again they'll start as a new pending account.`)) setUsers((rows) => rows.filter((r) => r.id !== u.id)) }}
+                                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"
+                                  title="Delete permanently"
+                                ><Trash2 className="size-3" /> Delete</button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -751,6 +762,25 @@ export function DashboardClient({ user }: { user: User }) {
                           {openJobs > 0 && <span className="rounded-full bg-amber-300/10 px-2 py-0.5 text-amber-200">{openJobs} active</span>}
                           {value > 0 && <span className="rounded-full bg-emerald-300/10 px-2 py-0.5 text-emerald-200">GHS {value.toFixed(0)}</span>}
                         </div>
+                        {isSuperAdmin && (
+                          <button
+                            onClick={async (e) => {
+                              e.preventDefault()
+                              const label = g.name || g.contact || 'this client'
+                              const ok = await superDelete('brief', g.briefs.map((b) => b.id), `Delete ALL ${g.briefs.length} brief(s) and ${g.files.length} file(s) for ${label}?`)
+                              if (!ok) return
+                              if (g.files.length) {
+                                const res = await fetch('/api/admin/delete', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ type: 'upload', ids: g.files.map((x) => x.id) }) })
+                                const d = await res.json().catch(() => ({}))
+                                if (d.files?.length) await createClient().storage.from('uploads').remove(d.files)
+                              }
+                              setIntake((rows) => rows.filter((r) => !g.briefs.some((b) => b.id === r.id)))
+                              setUploads((rows) => rows.filter((r) => !g.files.some((x) => x.id === r.id)))
+                            }}
+                            title="Delete all of this client's briefs and files" aria-label="Delete client data"
+                            className="rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"
+                          ><Trash2 className="size-4" /></button>
+                        )}
                         <ChevronDown className="size-4 text-slate-500 transition group-open:rotate-180" />
                       </summary>
 
@@ -779,11 +809,25 @@ export function DashboardClient({ user }: { user: User }) {
                           </p>
                           <p className="mt-0.5 text-[11px] text-slate-500"><span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}</p>
                         </div>
-                        <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
+                        <span className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
+                          {isSuperAdmin && (
+                            <>
+                              <button onClick={() => setEditing(editing === s.id ? null : s.id)} title="Edit everything" aria-label={`Edit ${s.ticketId}`} className="rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-slate-300 hover:border-cyan-300/50 hover:text-cyan-200">Edit</button>
+                              <button
+                                onClick={async () => { if (await superDelete('brief', [s.id], `Delete brief ${s.ticketId} "${briefTitle(s)}" and its attachment?`)) setIntake((rows) => rows.filter((r) => r.id !== s.id)) }}
+                                title="Delete brief" aria-label={`Delete ${s.ticketId}`} className="shrink-0 rounded p-0.5 text-slate-500 hover:text-rose-300"
+                              ><Trash2 className="size-3.5" /></button>
+                            </>
+                          )}
+                        </span>
                       </div>
                       <p className="mt-1 text-[11px] text-slate-500">
                         {[s.scope, s.urgency, s.createdAt ? fmtTime(s.createdAt) : null].filter(Boolean).join(' · ')}
                       </p>
+                      {editing === s.id && (
+                        <BriefEditor brief={s} onClose={() => setEditing(null)} onSaved={(d) => setIntake((rows) => rows.map((r) => (r.id === s.id ? { ...r, ...(d as Partial<IntakeRow>) } : r)))} />
+                      )}
                       {s.briefDetails && <details className="mt-2 text-sm text-slate-300"><summary className="cursor-pointer select-none text-xs text-cyan-300 hover:text-cyan-200">Read brief</summary><p className="mt-2 whitespace-pre-wrap leading-6">{s.briefDetails}</p></details>}
                       {s.fileUrls && /^https?:\/\//.test(s.fileUrls) && (
                         <a href={s.fileUrls} target="_blank" rel="noopener noreferrer" download className="mt-3 inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500">
@@ -878,6 +922,12 @@ export function DashboardClient({ user }: { user: User }) {
                       >
                         <Download className="size-4" /> Download
                       </a>
+                      {isSuperAdmin && (
+                        <button
+                          onClick={async () => { if (await superDelete('upload', [f.id], `Delete the file "${f.file_name}"?`)) setUploads((rows) => rows.filter((r) => r.id !== f.id)) }}
+                          title="Delete file" aria-label={`Delete ${f.file_name}`} className="shrink-0 rounded p-0.5 text-slate-500 hover:text-rose-300"
+                        ><Trash2 className="size-4" /></button>
+                      )}
                     </div>
                               ))}
                             </div>
@@ -931,6 +981,22 @@ export function DashboardClient({ user }: { user: User }) {
                         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">
                           {c.unread}
                         </span>
+                      )}
+                      {isSuperAdmin && (
+                        <button
+                          onClick={async (e) => {
+                            e.preventDefault()
+                            if (await superDelete('conversation', [c.id], `Delete the whole conversation with ${c.clientName}, including all messages and files?`)) {
+                              setConversations((rows) => rows.filter((r) => r.id !== c.id))
+                              setUploads((rows) => rows.filter((r) => r.conversation_id !== c.id))
+                            }
+                          }}
+                          title="Delete conversation"
+                          aria-label={`Delete conversation with ${c.clientName}`}
+                          className="shrink-0 rounded-lg p-1.5 text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"
+                        >
+                          <Trash2 className="size-4" />
+                        </button>
                       )}
                     </a>
                   ))}
