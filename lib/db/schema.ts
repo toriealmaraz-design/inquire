@@ -151,3 +151,15 @@ export const chatbotMisses = pgTable('chatbot_misses', {
   hits: integer('hits').notNull().default(1),
   lastAt: timestamp('last_at').notNull().defaultNow(),
 })
+
+// In-app notification inbox (the bell). Every push is also stored here.
+export const notifications = pgTable('notifications', {
+  id: serial('id').primaryKey(),
+  userId: integer('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 160 }).notNull(),
+  body: text('body'),
+  url: varchar('url', { length: 300 }),
+  tag: varchar('tag', { length: 80 }),
+  read: boolean('read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})

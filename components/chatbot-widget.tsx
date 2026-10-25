@@ -15,7 +15,7 @@ const WELCOME: Line = {
   text: "Hi! I'm the Gemini Nexus assistant. Ask me about prices, deadlines, files or payment, type your ticket number (like AC-2610-001) to check a brief, or pick a question below.",
 }
 // Staff pages and the live chat itself don't need the assistant
-const HIDDEN_ON = ['/chat', '/dashboard', '/agent', '/auth', '/admin']
+const HIDDEN_ON = ['/chat', '/dashboard', '/agent', '/auth', '/admin', '/help', '/onboarding']
 
 const GREETINGS = /^(hi|hello|hey|good (morning|afternoon|evening)|yo|hiya)\b/i
 const THANKS = /\b(thanks|thank you|thx|ok(ay)?|cool|great)\b/i

@@ -4,6 +4,7 @@ import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
+import { NotificationBell } from '@/components/notification-bell'
 import { SupportPresence } from '@/components/support-presence'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
@@ -27,7 +28,7 @@ import {
   Save,
   ShieldCheck,
   FileText,
-  Bell,
+  BookOpen,
   Download,
   Trash2,
   Pencil,
@@ -152,7 +153,6 @@ export function DashboardClient({ user }: { user: User }) {
   const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
-  const [notifEnabled, setNotifEnabled] = useState(false)
   const [supabase] = useState(() => createClient())
   const router = useRouter()
 
@@ -196,18 +196,8 @@ export function DashboardClient({ user }: { user: User }) {
     setUploads((ups as UploadRow[]) || [])
   }, [supabase])
 
-  const requestNotif = useCallback(async () => {
-    if (typeof Notification === 'undefined') return
-    if (Notification.permission === 'granted') {
-      setNotifEnabled(true)
-      return
-    }
-    const perm = await Notification.requestPermission()
-    setNotifEnabled(perm === 'granted')
-  }, [])
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifEnabled(true)
     loadChatData()
     // Batch bursts of realtime events into one refetch.
     let timer: ReturnType<typeof setTimeout> | undefined
@@ -221,10 +211,6 @@ export function DashboardClient({ user }: { user: User }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         scheduleReload()
-        const r = payload.new as DbMsg
-        if (r.sender_type === 'client' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('New client message', { body: r.content.slice(0, 120) })
-        }
       })
       .subscribe()
     return () => {
@@ -514,18 +500,12 @@ export function DashboardClient({ user }: { user: User }) {
               </p>
               <h1 className="mt-2 text-3xl font-bold tracking-tight">{tab}</h1>
             </div>
-            <button
-              onClick={() => { requestNotif(); setTab('Chats') }}
-              title={notifEnabled ? 'Notifications on — click to view chats' : 'Enable notifications'}
-              className={`relative flex size-11 items-center justify-center rounded-2xl ${glass} ${notifEnabled ? 'text-cyan-300' : 'text-slate-400'} hover:text-white`}
-            >
-              <Bell className="size-5" />
-              {unread > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-5 h-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                  {unread}
-                </span>
-              )}
-            </button>
+            <div className="flex items-center gap-2">
+              <a href="/help" className="flex h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.075] px-4 text-xs font-semibold text-slate-300 backdrop-blur-2xl hover:text-white">
+                <BookOpen className="size-4" /> Help
+              </a>
+              <NotificationBell />
+            </div>
           </div>
 
           <div className="mt-6"><PushPrompt showTest /></div>

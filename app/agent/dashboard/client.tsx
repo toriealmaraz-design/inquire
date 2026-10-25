@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet } from 'lucide-react'
+import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet, BookOpen } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
+import { NotificationBell } from '@/components/notification-bell'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { RoleWatcher } from '@/components/role-watcher'
@@ -53,8 +54,6 @@ const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/2
 export function AgentDashboardClient({ user }: { user: User }) {
   const router = useRouter()
   const [supabase] = useState(() => createClient())
-  const unread = 0
-  const [notifEnabled, setNotifEnabled] = useState(false)
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
   const [copied, setCopied] = useState(false)
@@ -93,18 +92,8 @@ export function AgentDashboardClient({ user }: { user: User }) {
     }
   }
 
-  const requestNotif = useCallback(async () => {
-    if (typeof Notification === 'undefined') return
-    if (Notification.permission === 'granted') {
-      setNotifEnabled(true)
-      return
-    }
-    const perm = await Notification.requestPermission()
-    setNotifEnabled(perm === 'granted')
-  }, [])
 
   useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') setNotifEnabled(true)
     load()
     let timer: ReturnType<typeof setTimeout> | undefined
     const scheduleReload = () => {
@@ -116,10 +105,6 @@ export function AgentDashboardClient({ user }: { user: User }) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         scheduleReload()
-        const r = payload.new as any
-        if (r.sender_type === 'client' && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-          new Notification('New client message', { body: String(r.content || '').slice(0, 120) })
-        }
       })
       .subscribe()
     return () => {
@@ -152,18 +137,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={requestNotif}
-              title={notifEnabled ? 'Notifications on' : 'Enable notifications'}
-              className={`relative flex size-11 items-center justify-center rounded-2xl ${glass} ${notifEnabled ? 'text-cyan-300' : 'text-slate-400'} hover:text-white`}
-            >
-              <Bell className="size-5" />
-              {unread > 0 && (
-                <span className="absolute -right-1 -top-1 flex min-w-5 h-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-bold text-white">
-                  {unread}
-                </span>
-              )}
-            </button>
+            <a href="/help" className="flex h-11 items-center gap-2 rounded-2xl px-3 text-xs text-slate-400 hover:text-white">
+              <BookOpen className="size-4" /> Help
+            </a>
+            <NotificationBell />
             <button onClick={handleSignOut} className="flex items-center gap-2 rounded-2xl px-3 py-2 text-xs text-slate-400 hover:text-white">
               <LogOut className="size-4" /> Sign out
             </button>

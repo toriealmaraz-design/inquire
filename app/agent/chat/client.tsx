@@ -4,10 +4,11 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
+import { NotificationBell } from '@/components/notification-bell'
 import { SupportPresence } from '@/components/support-presence'
 import { RoleWatcher } from '@/components/role-watcher'
 import { superDelete } from '@/lib/admin-delete'
-import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, Bell, BellOff } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen } from 'lucide-react'
 
 type User = {
   id?: string
@@ -92,7 +93,6 @@ export function AgentChatClient({ user }: { user: User }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [notifEnabled, setNotifEnabled] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeConvoRef = useRef<number | null>(null)
@@ -140,22 +140,6 @@ export function AgentChatClient({ user }: { user: User }) {
     setConversations(list)
   }, [supabase])
 
-  // Ask for browser notification permission
-  const requestNotif = useCallback(async () => {
-    if (typeof Notification === 'undefined') return
-    if (Notification.permission === 'granted') {
-      setNotifEnabled(true)
-      return
-    }
-    const perm = await Notification.requestPermission()
-    setNotifEnabled(perm === 'granted')
-  }, [])
-
-  useEffect(() => {
-    if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-      setNotifEnabled(true)
-    }
-  }, [])
 
   // Initial load + global realtime subscriptions (new convos + all new messages)
   useEffect(() => {
@@ -175,11 +159,6 @@ export function AgentChatClient({ user }: { user: User }) {
         scheduleReload()
         if (activeConvoRef.current === r.conversation_id) {
           setMessages((prev) => (prev.some((m) => m.id === r.id) ? prev : [...prev, rowToMessage(r)]))
-        }
-        if (r.sender_type === 'client' && activeConvoRef.current !== r.conversation_id) {
-          if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
-            new Notification('New client message', { body: maskFiles(r.content, isAdminUser).slice(0, 120) })
-          }
         }
       })
       .subscribe()
@@ -294,13 +273,10 @@ export function AgentChatClient({ user }: { user: User }) {
               <p className="text-sm font-bold text-white truncate">{user.name}</p>
               <p className="text-[10px] text-cyan-300 uppercase">{user.role?.replace('_', ' ')}</p>
             </div>
-            <button
-              onClick={requestNotif}
-              title={notifEnabled ? 'Notifications on' : 'Enable notifications'}
-              className={`p-2 rounded-lg hover:bg-white/10 ${notifEnabled ? 'text-cyan-300' : 'text-slate-500'}`}
-            >
-              {notifEnabled ? <Bell className="size-4" /> : <BellOff className="size-4" />}
-            </button>
+            <a href="/help" title="How to use" aria-label="Help manual" className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white">
+              <BookOpen className="size-4" />
+            </a>
+            <NotificationBell />
           </div>
         </div>
 

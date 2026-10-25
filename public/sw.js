@@ -11,13 +11,18 @@ self.addEventListener('push', (event) => {
   }
   const title = data.title || 'Gemini Nexus'
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body: data.body || '',
-      icon: '/icon.svg',
-      badge: '/icon.svg',
-      tag: data.tag,
-      data: { url: data.url || '/dashboard' },
-    })
+    Promise.all([
+      self.registration.showNotification(title, {
+        body: data.body || '',
+        icon: '/icon.svg',
+        badge: '/icon.svg',
+        tag: data.tag,
+        renotify: !!data.tag,
+        data: { url: data.url || '/dashboard' },
+      }),
+      // Tell any open tabs so their notification bell refreshes instantly
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => wins.forEach((w) => w.postMessage({ type: 'push' }))),
+    ])
   )
 })
 

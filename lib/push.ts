@@ -1,7 +1,7 @@
 import webpush from 'web-push'
 import { and, eq, inArray } from 'drizzle-orm'
 import { db } from '@/lib/db'
-import { pushSubscriptions, settings, users } from '@/lib/db/schema'
+import { notifications, pushSubscriptions, settings, users } from '@/lib/db/schema'
 
 export type PushPayload = { title: string; body: string; url?: string; tag?: string }
 
@@ -29,18 +29,36 @@ export async function getVapidPublicKey() {
 }
 
 /**
- * Send a push to active staff devices.
+ * Notify active staff: saves an in-app notification AND pushes to their devices.
  * - userIds: only those users
  * - field: only staff assigned to that field
  * - neither: every active staff member
  * Dead subscriptions (404/410) are removed. Returns devices reached.
  */
 export async function sendPush(target: Target, payload: PushPayload) {
-  if (!(await configure())) return 0
-
   const conditions = [eq(users.status, 'active')]
   if (target.userIds?.length) conditions.push(inArray(users.id, target.userIds))
   else if (target.field) conditions.push(eq(users.field, target.field))
+  if (target.userIds && !target.userIds.length) return 0
+
+  // 1) Save to every recipient's in-app notification bell (works even without push enabled).
+  //    A newer alert with the same tag (e.g. chat reminders) replaces the older unread one.
+  try {
+    const recipients = (await db.select({ id: users.id }).from(users).where(and(...conditions))).map((u) => u.id)
+    if (recipients.length && payload.tag !== 'test') {
+      if (payload.tag) {
+        await db.delete(notifications).where(and(inArray(notifications.userId, recipients), eq(notifications.tag, payload.tag), eq(notifications.read, false)))
+      }
+      await db.insert(notifications).values(
+        recipients.map((userId) => ({ userId, title: payload.title.slice(0, 160), body: payload.body?.slice(0, 500), url: payload.url || null, tag: payload.tag || null }))
+      )
+    }
+  } catch (error) {
+    console.error('Saving notifications failed:', error)
+  }
+
+  // 2) Push to their devices
+  if (!(await configure())) return 0
 
   const subs = await db
     .select({ id: pushSubscriptions.id, endpoint: pushSubscriptions.endpoint, p256dh: pushSubscriptions.p256dh, auth: pushSubscriptions.auth })
