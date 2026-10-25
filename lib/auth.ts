@@ -72,6 +72,7 @@ export class AccountLookupError extends Error {}
 
 // For pages: signed out -> null; database failure -> AccountLookupError (no silent sign-in loop)
 export async function getUserOrThrow(): Promise<AppUser | null> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user?.email) return null

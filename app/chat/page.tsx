@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, PhoneCall, Square } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
@@ -27,7 +27,7 @@ type DbMessage = {
 type Stored = { name: string; contact?: string; convoId: number | null; named?: boolean }
 
 const STORAGE_KEY = 'inquire_client'
-const MAX_FILE_BYTES = 50 * 1024 * 1024
+const MAX_FILE_BYTES = 15 * 1024 * 1024
 const QUICK_STARTS = ['I need a quote for an assignment', 'I want to check on my brief', 'I have an urgent deadline']
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -51,7 +51,12 @@ const rowToMessage = (r: DbMessage): Message => ({
 // "📎 name\nurl" -> file card
 function parseFile(text: string) {
   const m = text.match(/^📎 (.+)\n(https?:\/\/\S+)$/)
-  return m ? { name: m[1], url: m[2], isImage: /\.(png|jpe?g|gif|webp|avif)$/i.test(m[1]) } : null
+  return m ? { name: m[1], url: m[2], isImage: /\.(png|jpe?g|gif|webp|avif)$/i.test(m[1]), isAudio: false } : null
+}
+
+function parseAudio(text: string) {
+  const m = text.match(/^🎙️ Voice message\n(https?:\/\/\S+)$/)
+  return m ? { url: m[1] } : null
 }
 
 function Linkified({ text }: { text: string }) {
@@ -91,6 +96,10 @@ export default function ChatPage() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const textRef = useRef<HTMLTextAreaElement>(null)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const audioChunksRef = useRef<Blob[]>([])
+  const [recording, setRecording] = useState(false)
+  const [callMessage, setCallMessage] = useState('')
 
   const save = (next: Stored) => {
     setProfile(next)
@@ -274,11 +283,59 @@ export default function ChatPage() {
     textRef.current?.focus()
   }
 
+  const toggleRecording = async () => {
+    if (recording) {
+      recorderRef.current?.stop()
+      setRecording(false)
+      return
+    }
+    if (!navigator.mediaDevices?.getUserMedia || !('MediaRecorder' in window)) {
+      setError('Audio recording is not supported on this device. Please type a message instead.')
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      recorder.ondataavailable = (event) => event.data.size && audioChunksRef.current.push(event.data)
+      recorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop())
+        const blob = new Blob(audioChunksRef.current, { type: recorder.mimeType || 'audio/webm' })
+        if (blob.size > MAX_FILE_BYTES) return setError('That voice message is over 15 MB. Please record a shorter message.')
+        setUploadName('voice message')
+        try {
+          const id = await ensureConversation()
+          if (!id) throw new Error()
+          const path = `${id}/${Date.now()}-voice-message.webm`
+          const { error: uploadError } = await supabase!.storage.from('uploads').upload(path, blob, { contentType: blob.type, upsert: false })
+          if (uploadError) throw uploadError
+          const url = supabase!.storage.from('uploads').getPublicUrl(path).data.publicUrl
+          await supabase!.from('uploads').insert({ conversation_id: id, file_name: 'Voice message.webm', file_url: url, file_type: blob.type, file_size: blob.size, uploaded_by: 'client' })
+          await postMessage(`🎙️ Voice message\n${url}`)
+        } catch {
+          setError('We could not send your voice message. Please try again.')
+        } finally {
+          setUploadName('')
+        }
+      }
+      recorderRef.current = recorder
+      recorder.start()
+      setRecording(true)
+    } catch {
+      setError('Please allow microphone access to record a voice message.')
+    }
+  }
+
+  const startCall = () => {
+    window.location.href = 'tel:+233206478727'
+    setCallMessage('Calling our support line…')
+  }
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file || !supabase || uploadName) return
-    if (file.size > MAX_FILE_BYTES) return setError('That file is over 50 MB. Please compress it or send a link instead.')
+    if (file.size > MAX_FILE_BYTES) return setError('That file is over 15 MB. Please compress it or send a link instead.')
     setError('')
     setUploadName(file.name)
     try {
@@ -347,6 +404,13 @@ export default function ChatPage() {
             <h1 className="truncate text-sm font-semibold">Gemini Nexus Support</h1>
             <p className={`truncate text-xs ${online ? 'text-emerald-400' : 'text-slate-400'}`} aria-live="polite">{statusText}</p>
           </div>
+          <button
+            onClick={startCall}
+            aria-label="Call support"
+            className="flex items-center gap-1.5 rounded-full border border-emerald-300/30 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-300/10"
+          >
+            <PhoneCall className="size-3" /> Call
+          </button>
           <button
             onClick={() => setEditingName((v) => !v)}
             aria-expanded={editingName}
@@ -428,6 +492,7 @@ export default function ChatPage() {
               {g.items.map((m) => {
                 const mine = m.sender === 'user'
                 const file = parseFile(m.text)
+                const audio = parseAudio(m.text)
                 return (
                   <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div
@@ -436,7 +501,12 @@ export default function ChatPage() {
                       } ${m.pending ? 'opacity-70' : ''}`}
                     >
                       {!mine && <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">{m.bot ? 'Nexus Assistant · auto-reply' : 'Gemini Nexus'}</p>}
-                      {file ? (
+                      {audio ? (
+                        <div className="min-w-56">
+                          <p className="mb-1 text-xs text-cyan-100">Voice message</p>
+                          <audio controls preload="metadata" src={audio.url} className="max-w-full" />
+                        </div>
+                      ) : file ? (
                         <a href={file.url} target="_blank" rel="noopener noreferrer" className="block">
                           {file.isImage && (
                             // eslint-disable-next-line @next/next/no-img-element
@@ -519,6 +589,14 @@ export default function ChatPage() {
             className="min-h-11 flex-1 resize-none rounded-2xl border border-white/10 bg-[#0f2847] px-4 py-3 text-sm outline-none placeholder:text-slate-500 focus:border-cyan-500/50"
           />
           <button
+            onClick={toggleRecording}
+            disabled={sending || !!uploadName}
+            aria-label={recording ? 'Stop recording' : 'Record voice message'}
+            className={`flex size-11 shrink-0 items-center justify-center rounded-full ${recording ? 'bg-rose-500 text-white' : 'text-slate-400 hover:bg-white/5 hover:text-cyan-300'} disabled:opacity-50`}
+          >
+            {recording ? <Square className="size-4" /> : <Mic className="size-5" />}
+          </button>
+          <button
             onClick={() => send()}
             disabled={sending || !input.trim()}
             aria-label="Send message"
@@ -527,7 +605,7 @@ export default function ChatPage() {
             {sending ? <Loader2 className="size-5 animate-spin" /> : <Send className="size-5" />}
           </button>
         </div>
-        <p className="mx-auto mt-1.5 max-w-3xl text-center text-[10px] text-slate-500">Files up to 50 MB · kept for 7 days · only our admins can see them</p>
+        <p className="mx-auto mt-1.5 max-w-3xl text-center text-[10px] text-slate-500">Files up to 15 MB · kept for 7 days · only our admins can see them</p>
       </div>
     </main>
   )
