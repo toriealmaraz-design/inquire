@@ -24,3 +24,7 @@ export function briefTitle(s: { title?: string | null; briefDetails?: string | n
   if (first) return first.length > 70 ? `${first.slice(0, 67).trimEnd()}…` : first
   return `Untitled ${s.serviceType ? s.serviceType.split(' ')[0].toLowerCase() : ''} brief`.replace('  ', ' ')
 }
+
+// Ticket numbers: AC-2610-001 (Academic), MD-… (Media), IT-… (Systems); older ones GN-1042
+export const TICKET_RE = /\b(?:(?:AC|MD|IT|GN)-?\d{4}-?\d{3}|GN-?\d{3,6})\b/i
+export const normTicket = (t: string) => t.toUpperCase().replace(/-/g, '')

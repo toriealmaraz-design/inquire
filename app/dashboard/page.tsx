@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getPageUser, isAdmin } from '@/lib/auth'
+import { needsOnboarding, getPageUser, isAdmin } from '@/lib/auth'
 import { DashboardClient } from './client'
 import { SignOutButton } from './signout-button'
 
@@ -12,6 +12,7 @@ export default async function DashboardPage() {
   if (!user) {
     redirect('/auth/signin')
   }
+  if (needsOnboarding(user)) redirect('/onboarding')
 
   const { status, role, email } = user
 

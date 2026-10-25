@@ -171,9 +171,10 @@ export function AgentDashboardClient({ user }: { user: User }) {
         </div>
 
         <RoleWatcher role={user.role} field={user.field} />
-        <div className="mt-6"><PushPrompt /></div>
+        <div className="mt-6"><PushPrompt showTest /></div>
 
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
+        <a href="/onboarding" className="mt-1 inline-block text-xs text-cyan-300 hover:underline">Edit my skills profile →</a>
         <p className="mt-1 text-sm text-slate-400">Your assignments, referral link and commission.</p>
 
         {/* Stats */}

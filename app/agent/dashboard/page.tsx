@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getPageUser, canChat } from '@/lib/auth'
+import { needsOnboarding, getPageUser, canChat } from '@/lib/auth'
 import { AgentDashboardClient } from './client'
 
 // Signed-in pages read cookies; never prerender them.
@@ -9,6 +9,7 @@ export default async function AgentDashboardPage() {
   const user = await getPageUser()
 
   if (!user) redirect('/auth/signin')
+  if (needsOnboarding(user)) redirect('/onboarding')
   if (user.status !== 'active') redirect('/dashboard')
   if (!canChat(user.role)) redirect('/dashboard')
 

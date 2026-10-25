@@ -8,5 +8,5 @@ export async function middleware(request: NextRequest) {
 // Only run the session refresh where auth matters. Public pages (/, /chat,
 // /auth/signin, /workflow, public APIs) skip the Supabase round-trip entirely.
 export const config = {
-  matcher: ['/dashboard/:path*', '/agent/:path*', '/admin/:path*', '/api/admin/:path*'],
+  matcher: ['/dashboard/:path*', '/onboarding/:path*', '/agent/:path*', '/admin/:path*', '/api/admin/:path*'],
 }

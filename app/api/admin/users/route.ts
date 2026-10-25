@@ -22,6 +22,8 @@ export async function GET() {
       status: users.status,
       field: users.field,
       createdAt: users.createdAt,
+      onboardedAt: users.onboardedAt,
+      profile: users.profile,
     })
     .from(users)
     .orderBy(asc(users.name))

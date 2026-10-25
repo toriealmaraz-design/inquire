@@ -1,4 +1,4 @@
-import { boolean, integer, numeric, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core'
+import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core'
 
 // Users (supports Google OAuth and Email auth)
 export const users = pgTable('users', {
@@ -11,6 +11,9 @@ export const users = pgTable('users', {
   status: varchar('status', { length: 20 }).notNull().default('active'),
   field: varchar('field', { length: 30 }), // 'academic' | 'media' | 'systems'
   referralCode: varchar('referral_code', { length: 20 }).unique(),
+  profile: jsonb('profile'),
+  onboardedAt: timestamp('onboarded_at'),
+  signupNotified: boolean('signup_notified').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 })

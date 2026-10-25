@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import { Bot, X, Send, MessageCircle, RotateCcw, FileText } from 'lucide-react'
+import { bestReply } from '@/lib/chatbot-match'
+import { TICKET_RE } from '@/lib/fields'
 
 type Reply = { id: number; question: string; keywords: string; reply: string }
 type Line = { from: 'bot' | 'me'; text: string; handoff?: string; brief?: boolean }
@@ -10,7 +12,7 @@ type Line = { from: 'bot' | 'me'; text: string; handoff?: string; brief?: boolea
 const HISTORY_KEY = 'nexus_bot_history'
 const WELCOME: Line = {
   from: 'bot',
-  text: "Hi! I'm the Gemini Nexus assistant. Ask me about prices, deadlines, files or payment, type your ticket number (like GN-1042) to check a brief, or pick a question below.",
+  text: "Hi! I'm the Gemini Nexus assistant. Ask me about prices, deadlines, files or payment, type your ticket number (like AC-2610-001) to check a brief, or pick a question below.",
 }
 // Staff pages and the live chat itself don't need the assistant
 const HIDDEN_ON = ['/chat', '/dashboard', '/agent', '/auth', '/admin']
@@ -20,20 +22,7 @@ const THANKS = /\b(thanks|thank you|thx|ok(ay)?|cool|great)\b/i
 const HUMAN = /\b(human|person|agent|admin|someone|real person|talk to|speak to|call)\b/i
 const BRIEF = /\b(start|submit|new brief|order|request|get started|place an order)\b/i
 
-// Keyword scoring: longer/more matches win. No AI service: free and instant.
-function match(text: string, replies: Reply[]): Reply | null {
-  const msg = text.toLowerCase()
-  let best: { r: Reply; score: number } | null = null
-  for (const r of replies) {
-    const score = r.keywords
-      .split(',')
-      .map((k) => k.trim())
-      .filter((k) => k.length > 1 && msg.includes(k))
-      .reduce((s, k) => s + k.length, 0)
-    if (score > 0 && (!best || score > best.score)) best = { r, score }
-  }
-  return best?.r ?? null
-}
+const match = (text: string, replies: Reply[]) => bestReply(text, replies) as Reply | null
 
 export function ChatbotWidget() {
   const pathname = usePathname() || '/'
@@ -74,7 +63,7 @@ export function ChatbotWidget() {
   const respond = async (q: string, picked?: Reply): Promise<Line> => {
     if (picked) return { from: 'bot', text: picked.reply }
 
-    const ticket = q.toUpperCase().match(/GN-?\d{3,6}/)
+    const ticket = q.match(TICKET_RE)
     if (ticket) {
       try {
         const res = await fetch(`/api/ticket?id=${encodeURIComponent(ticket[0])}`)
@@ -198,7 +187,7 @@ export function ChatbotWidget() {
                 ref={inputRef}
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask a question or type GN-1042…"
+                placeholder="Ask a question or type your ticket no.…"
                 aria-label="Ask the assistant"
                 maxLength={300}
                 className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-3 text-sm text-white outline-none placeholder:text-slate-500 focus:border-cyan-500/50"

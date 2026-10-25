@@ -35,6 +35,8 @@ export type AppUser = {
   status: string
   field: string | null
   referralCode: string | null
+  onboardedAt?: Date | null
+  profile?: unknown
 }
 
 // Active staff member (any chat role) or null
@@ -96,6 +98,11 @@ export async function getPageUser(): Promise<AppUser | null> {
   return user
 }
 
+// Approved staff (not the super admin) must finish the skills questionnaire first
+export function needsOnboarding(user: AppUser) {
+  return user.status === 'active' && user.role !== 'super_admin' && !user.onboardedAt
+}
+
 // For API routes: any failure -> null (routes answer 403)
 export async function getUser(): Promise<AppUser | null> {
   try {
@@ -106,6 +113,23 @@ export async function getUser(): Promise<AppUser | null> {
   } catch (error) {
     console.error('getUser error:', error)
     return null
+  }
+}
+
+// Push the super admin once per new signup (marks the user so it never repeats)
+async function notifySignup(u: { id: number; name: string; email: string }) {
+  try {
+    const [claimed] = await db
+      .update(users)
+      .set({ signupNotified: true })
+      .where(and(eq(users.id, u.id), eq(users.signupNotified, false)))
+      .returning({ id: users.id })
+    if (!claimed) return
+    const { sendPush } = await import('@/lib/push')
+    const admins = await db.select({ id: users.id }).from(users).where(eq(users.role, 'super_admin'))
+    await sendPush({ userIds: admins.map((a) => a.id) }, { title: 'New signup waiting for approval', body: `${u.name} (${u.email})`, url: '/dashboard', tag: `signup-${u.id}` })
+  } catch (error) {
+    console.error('Signup push failed:', error)
   }
 }
 
@@ -124,6 +148,7 @@ async function loadAppUser(user: AuthUser): Promise<AppUser> {
     if (Object.keys(updates).length) {
       await db.update(users).set({ ...updates, updatedAt: new Date() }).where(eq(users.id, dbUser.id))
     }
+    if (dbUser.status === 'pending' && !dbUser.signupNotified) await notifySignup(dbUser)
     return { ...dbUser, ...updates }
   }
 
@@ -137,11 +162,14 @@ async function loadAppUser(user: AuthUser): Promise<AppUser> {
       name: meta.full_name || meta.name || email.split('@')[0],
       avatar: meta.avatar_url || null,
       role: isSuperAdmin ? 'super_admin' : 'agent',
-      status: 'active', // auto-approve
+      status: isSuperAdmin ? 'active' : 'pending', // everyone else waits for approval
     })
     .onConflictDoNothing()
     .returning()
-  if (newUser) return newUser
+  if (newUser) {
+    if (!isSuperAdmin) await notifySignup(newUser)
+    return newUser
+  }
 
   // Created at the same moment by another tab: read it back
   const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1)

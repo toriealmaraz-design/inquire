@@ -205,6 +205,8 @@ export default function ChatPage() {
       return rest.some((m) => m.id === r.id) ? rest : [...rest, rowToMessage(r)]
     })
     supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', id).then(() => {})
+    // Push-alert the admins (server throttles this per conversation)
+    fetch('/api/chat/notify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId: id }), keepalive: true }).catch(() => {})
     return true
   }
 

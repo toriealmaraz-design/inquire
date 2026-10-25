@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq, inArray, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
@@ -83,31 +83,24 @@ export async function POST(request: Request) {
       referredBy = agent?.id ?? null
     }
 
-    let created: { id: number; ticketId: string } | undefined
-    for (let attempt = 0; attempt < 3 && !created; attempt++) {
-      const [latest] = await db.select({ ticketId: submissions.ticketId }).from(submissions).orderBy(desc(submissions.id)).limit(1)
-      const latestNumber = latest?.ticketId ? Number(latest.ticketId.replace(/\D/g, '')) : 1041
-      const ticketId = `GN-${(Number.isFinite(latestNumber) ? latestNumber : 1041) + 1 + attempt}`
-      try {
-        ;[created] = await db
-          .insert(submissions)
-          .values({
-            ticketId,
-            category,
-            serviceType,
-            title: briefTitle({ title: clean(body.title, 120), briefDetails: clean(body.briefDetails, 1600), serviceType }),
-            scope: clean(body.scope, 50),
-            urgency: clean(body.urgency, 50),
-            clientContact: clean(body.clientContact, 50),
-            briefDetails: clean(body.briefDetails, 1600),
-            fileUrls: clean(body.fileUrls, 1000),
-            referredBy,
-          })
-          .returning({ id: submissions.id, ticketId: submissions.ticketId })
-      } catch (error) {
-        if (attempt === 2) throw error // ticket number collision 3 times: give up
-      }
-    }
+    // Track-based ticket number from the database, e.g. AC-2610-007 (never collides)
+    const { rows: [num] } = await db.execute(sql`select public.next_ticket_id(${category}) as id`)
+    const ticketId = String((num as { id: string }).id)
+    const [created] = await db
+      .insert(submissions)
+      .values({
+        ticketId,
+        category,
+        serviceType,
+        title: briefTitle({ title: clean(body.title, 120), briefDetails: clean(body.briefDetails, 1600), serviceType }),
+        scope: clean(body.scope, 50),
+        urgency: clean(body.urgency, 50),
+        clientContact: clean(body.clientContact, 50),
+        briefDetails: clean(body.briefDetails, 1600),
+        fileUrls: clean(body.fileUrls, 1000),
+        referredBy,
+      })
+      .returning({ id: submissions.id, ticketId: submissions.ticketId })
     if (!created) throw new Error('Insert failed')
 
     // Tell the super admin + admins of this field, and the referring agent

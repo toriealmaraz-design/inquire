@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation'
-import { getPageUser, isAdmin } from '@/lib/auth'
+import { needsOnboarding, getPageUser, isAdmin } from '@/lib/auth'
 import { AgentChatClient } from './client'
 
 // Signed-in pages read cookies; never prerender them.
@@ -11,6 +11,7 @@ export default async function AgentChatPage() {
   if (!user) {
     redirect('/auth/signin')
   }
+  if (needsOnboarding(user)) redirect('/onboarding')
 
   const { status, role } = user
 

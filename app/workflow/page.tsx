@@ -5,7 +5,7 @@ const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/2
 
 const stages = [
   { title: 'You send a brief', description: 'Submit the intake form or start a Live Chat. Add the scope, deadline and any files (up to 50 MB).', icon: ClipboardList, tone: 'from-cyan-400/20 to-blue-500/10 text-cyan-200' },
-  { title: 'It lands on one secure line', description: 'Every request gets a ticket number (like GN-1042) and goes into one private queue. Only our admins see your details and files.', icon: LockKeyhole, tone: 'from-indigo-400/20 to-violet-500/10 text-indigo-200' },
+  { title: 'It lands on one secure line', description: 'Every request gets a ticket number (like AC-2610-001) and goes into one private queue. Only our admins see your details and files.', icon: LockKeyhole, tone: 'from-indigo-400/20 to-violet-500/10 text-indigo-200' },
   { title: 'An admin reviews and quotes', description: 'The admin for your field checks the requirements and sends a custom GHS quote in Live Chat. No deposit is needed to get a quote.', icon: MessageCircle, tone: 'from-emerald-400/20 to-teal-500/10 text-emerald-200' },
   { title: 'The right specialist is assigned', description: 'Once you agree, the job is given to a vetted specialist in that field. They see the brief, never your contact details.', icon: Users, tone: 'from-violet-400/20 to-fuchsia-500/10 text-violet-200' },
   { title: 'Work is done with oversight', description: 'Your admin tracks progress and keeps you updated in Live Chat. Send your ticket number any time to check its status.', icon: CheckCircle2, tone: 'from-amber-300/20 to-orange-500/10 text-amber-200' },

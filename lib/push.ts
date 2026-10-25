@@ -49,8 +49,19 @@ export async function sendPush(target: Target, payload: PushPayload) {
     .where(and(...conditions))
 
   const body = JSON.stringify(payload)
+  const deliver = (s: (typeof subs)[number]) =>
+    webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, { TTL: 60 * 60 * 24, timeout: 10_000 })
   const results = await Promise.allSettled(
-    subs.map((s) => webpush.sendNotification({ endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } }, body, { TTL: 60 * 60 * 24 }))
+    subs.map(async (s) => {
+      try {
+        return await deliver(s)
+      } catch (error) {
+        // Network blips have no status code: retry once
+        if ((error as { statusCode?: number })?.statusCode) throw error
+        await new Promise((r) => setTimeout(r, 800))
+        return deliver(s)
+      }
+    })
   )
 
   const dead: number[] = []
@@ -58,9 +69,9 @@ export async function sendPush(target: Target, payload: PushPayload) {
   results.forEach((r, i) => {
     if (r.status === 'fulfilled') sent++
     else {
-      const code = (r.reason as { statusCode?: number })?.statusCode
-      if (code === 404 || code === 410) dead.push(subs[i].id)
-      else console.error('Push send failed:', code, (r.reason as Error)?.message)
+      const err = r.reason as { statusCode?: number; body?: string; message?: string }
+      if (err?.statusCode === 404 || err?.statusCode === 410) dead.push(subs[i].id)
+      else console.error('Push send failed:', err?.statusCode ?? 'network', new URL(subs[i].endpoint).host, (err?.body || err?.message || String(r.reason)).slice(0, 200))
     }
   })
   if (dead.length) await db.delete(pushSubscriptions).where(inArray(pushSubscriptions.id, dead))

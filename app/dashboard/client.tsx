@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { Fragment, useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
@@ -9,11 +9,12 @@ import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { ChatbotSettings } from '@/components/chatbot-settings'
 import { RoleWatcher } from '@/components/role-watcher'
+import { ProfileCard } from '@/components/profile-card'
+import { AnalyticsBoard } from '@/components/analytics-board'
 import { FIELDS, briefTitle } from '@/lib/fields'
 import {
   BarChart3,
   Check,
-  Clock3,
   LogOut,
   MessageCircle,
   Settings2,
@@ -52,6 +53,8 @@ type DBUser = {
   status: string
   field: string | null
   createdAt: string
+  onboardedAt?: string | null
+  profile?: Record<string, unknown> | null
 }
 
 type Convo = {
@@ -141,6 +144,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [staff, setStaff] = useState<{ id: number; name: string; role: string | null; field: string | null }[]>([])
   const [agentDraft, setAgentDraft] = useState<Record<number, string>>({})
   const [subSearch, setSubSearch] = useState('')
+  const [openProfile, setOpenProfile] = useState<number | null>(null)
   const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
@@ -520,29 +524,12 @@ export function DashboardClient({ user }: { user: User }) {
             </button>
           </div>
 
-          <div className="mt-6"><PushPrompt /></div>
+          <div className="mt-6"><PushPrompt showTest /></div>
         <RoleWatcher role={user.role} status={user.status} field={user.field} />
         {(isSuperAdmin || isSubAdmin) && <SupportPresence userId={String(user.id ?? user.email)} />}
 
-          {/* Overview Tab */}
-          {tab === 'Overview' && (
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ['Active Users', activeCount, Users, 'text-emerald-400'],
-                ['Pending Approval', pendingCount, Clock3, 'text-amber-400'],
-                ['Active Chats', conversations.length, MessageCircle, 'text-blue-400'],
-                ['Briefs', intake.length, Zap, 'text-violet-400'],
-              ].map(([label, value, Icon, color]: any) => (
-                <div key={label} className={`${glass} rounded-2xl p-5`}>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">{label}</span>
-                    <Icon className={`size-4 ${color}`} />
-                  </div>
-                  <p className="mt-4 text-2xl font-bold">{value}</p>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* Overview Tab: analytics */}
+          {tab === 'Overview' && <AnalyticsBoard onNavigate={(t) => nav.includes(t) && setTab(t)} />}
 
           {/* User Management Tab (Super Admin only) */}
           {tab === 'User Management' && isSuperAdmin && (
@@ -585,7 +572,8 @@ export function DashboardClient({ user }: { user: User }) {
                     </thead>
                     <tbody>
                       {users.map(u => (
-                        <tr key={u.id} className="border-b border-white/5">
+                        <Fragment key={u.id}>
+                        <tr className="border-b border-white/5">
                           <td className="py-4">
                             <div className="flex items-center gap-3">
                               {u.avatar ? (
@@ -595,7 +583,18 @@ export function DashboardClient({ user }: { user: User }) {
                                   {u.name[0]}
                                 </div>
                               )}
-                              <span className="font-medium">{u.name}</span>
+                              <div className="min-w-0">
+                                <span className="block font-medium">{u.name}</span>
+                                {u.status === 'active' && u.role !== 'super_admin' && (
+                                  u.onboardedAt ? (
+                                    <button onClick={() => setOpenProfile(openProfile === u.id ? null : u.id)} className="text-[11px] text-cyan-300 hover:underline">
+                                      {openProfile === u.id ? 'Hide profile' : 'View skills profile'}
+                                    </button>
+                                  ) : (
+                                    <span className="text-[11px] text-amber-300/80">Questionnaire not done yet</span>
+                                  )
+                                )}
+                              </div>
                             </div>
                           </td>
                           <td className="py-4 text-slate-400">{u.email}</td>
@@ -672,6 +671,12 @@ export function DashboardClient({ user }: { user: User }) {
                             </div>
                           </td>
                         </tr>
+                        {openProfile === u.id && u.profile && (
+                          <tr className="border-b border-white/5 bg-white/[0.03]">
+                            <td colSpan={6} className="p-4"><ProfileCard profile={u.profile} /></td>
+                          </tr>
+                        )}
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>
