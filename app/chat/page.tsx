@@ -204,9 +204,9 @@ export default function ChatPage() {
     el.style.height = `${Math.min(el.scrollHeight, 140)}px`
   }, [input])
 
-  const ensureConversation = useCallback(async (): Promise<number | null> => {
+  const ensureConversation = useCallback(async (fresh = false): Promise<number | null> => {
     if (!supabase || !profile) return null
-    if (convoId) return convoId
+    if (convoId && !fresh) return convoId
     const { data, error } = await supabase
       .from('conversations')
       .insert({ client_name: displayName(profile), status: 'active' })
@@ -222,14 +222,22 @@ export default function ChatPage() {
   // Returns the conversation id on success, or null
   const postMessage = async (content: string, tmpId?: string): Promise<number | null> => {
     if (!supabase) return null
-    const id = await ensureConversation()
+    let id = await ensureConversation()
     if (!id) return null
-    const { data, error } = await supabase
-      .from('messages')
-      .insert({ conversation_id: id, sender_type: 'client', content, read: false })
-      .select('*')
-      .single()
-    if (error || !data) return null
+    const insert = (cid: number) =>
+      supabase.from('messages').insert({ conversation_id: cid, sender_type: 'client', content, read: false }).select('*').single()
+    let { data, error } = await insert(id)
+    // The saved conversation no longer exists (e.g. deleted by an admin): start a new one and resend
+    if (error?.code === '23503') {
+      setMessages((prev) => prev.filter((m) => m.id === tmpId))
+      id = await ensureConversation(true)
+      if (!id) return null
+      ;({ data, error } = await insert(id))
+    }
+    if (error || !data) {
+      console.error('Live chat send failed:', error)
+      return null
+    }
     const r = data as DbMessage
     setMessages((prev) => {
       const rest = prev.filter((m) => m.id !== tmpId)
