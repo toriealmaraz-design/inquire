@@ -10,6 +10,7 @@ import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { ChatbotSettings } from '@/components/chatbot-settings'
   import { AssetManager } from '@/components/asset-manager'
+import { FeedbackManager } from '@/components/feedback-manager'
 import { RoleWatcher } from '@/components/role-watcher'
 import { ProfileCard } from '@/components/profile-card'
 import { AnalyticsBoard } from '@/components/analytics-board'
@@ -241,9 +242,9 @@ export function DashboardClient({ user }: { user: User }) {
   
   // Navigation based on role
   const nav = isSuperAdmin
-    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Complaints', 'Leaderboard', 'Announcements', 'Settings']
+    ? ['Overview', 'User Management', 'Submissions', 'Chats', 'Complaints', 'Feedback', 'Leaderboard', 'Announcements', 'Settings']
     : isSubAdmin
-    ? ['Overview', 'Submissions', 'Chats', 'Complaints', 'Leaderboard', 'Announcements']
+    ? ['Overview', 'Submissions', 'Chats', 'Complaints', 'Feedback', 'Leaderboard', 'Announcements']
     : ['Overview', 'Chats']
 
   useEffect(() => {
@@ -997,6 +998,10 @@ export function DashboardClient({ user }: { user: User }) {
           )}
 
           {tab === 'Leaderboard' && <div className="mt-8"><Leaderboard /></div>}
+
+          {tab === 'Feedback' && (isSuperAdmin || isSubAdmin) && (
+            <div className="mt-8"><FeedbackManager /></div>
+          )}
 
           {tab === 'Complaints' && (
             <div className="mt-8 flex flex-col gap-5">

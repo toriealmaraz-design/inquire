@@ -1,6 +1,7 @@
 import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Coins, KeyRound, LockKeyhole, MessageCircle, Palette, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react'
+import { BrandLogo } from '@/components/branding'
+import { SiteFooter } from '@/components/site-footer'
 
-const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 
 const stages = [
@@ -31,7 +32,7 @@ export default function WorkflowPage() {
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
           <a href="/" className="flex items-center gap-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={logoUrl} alt="Gemini Nexus" width={40} height={40} className="size-10 rounded-xl object-cover" />
+            <BrandLogo width={40} height={40} className="size-10 rounded-xl object-cover" />
             <span>
               <strong className="block text-sm tracking-tight">Gemini Nexus</strong>
               <small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small>
@@ -117,6 +118,7 @@ export default function WorkflowPage() {
           </div>
         </div>
       </section>
+      <SiteFooter />
     </main>
   )
 }

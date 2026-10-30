@@ -20,10 +20,11 @@ import {
   Zap,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { SiteFooter } from '@/components/site-footer'
+import { BrandLogo } from '@/components/branding'
 
 type Track = 'academic' | 'media' | 'systems'
 
-const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
 const tracks = [
   { id: 'academic' as Track, title: 'Academic & Research', subtitle: 'Essays, case studies, literature reviews', icon: BookOpen, color: 'from-cyan-400/20 to-blue-500/10' },
   { id: 'media' as Track, title: 'Presentations & Visuals', subtitle: 'Defense decks, infographics, media', icon: FileText, color: 'from-violet-400/20 to-fuchsia-500/10' },
@@ -121,10 +122,13 @@ export default function Page() {
     <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden"><div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" /><div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" /><div className="absolute bottom-0 left-1/2 size-80 rounded-full bg-violet-500/10 blur-[130px]" /></div>
     <header className="sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
-        <a href="/" className="flex items-center gap-3 text-left"><img src={logoUrl} alt="Gemini Nexus" width={40} height={40} className="size-10 rounded-xl object-cover" /><span><strong className="block text-sm tracking-tight">Gemini Nexus</strong><small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small></span></a>
+        <a href="/" className="flex items-center gap-3 text-left"><BrandLogo width={40} height={40} className="size-10 rounded-xl object-cover" /><span><strong className="block text-sm tracking-tight">Gemini Nexus</strong><small className="block text-[10px] uppercase tracking-[.2em] text-slate-500">Digital operations network</small></span></a>
         <nav className="hidden items-center gap-7 text-sm text-slate-400 md:flex">
           <a href="/" className="hover:text-white">Intake portal</a>
           <a href="/workflow" className="hover:text-white">How it works</a>
+          <a href="/about" className="hover:text-white">About</a>
+          <a href="/faq" className="hover:text-white">FAQ</a>
+          <a href="/feedback" className="hover:text-white">Feedback</a>
           <a href="/chat" className="hover:text-white">Live chat</a>
           <span className="flex items-center gap-2 rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 text-xs font-semibold text-emerald-300"><span className="size-1.5 rounded-full bg-emerald-300" /> Intake line active</span>
         </nav>
@@ -136,11 +140,15 @@ export default function Page() {
       {mobileNav && <nav className="flex flex-col gap-1 border-t border-white/10 px-5 py-3 text-sm text-slate-300 md:hidden">
         <a href="/" className="rounded-lg px-2 py-2 hover:bg-white/5">Intake portal</a>
         <a href="/workflow" className="rounded-lg px-2 py-2 hover:bg-white/5">How it works</a>
+        <a href="/about" className="rounded-lg px-2 py-2 hover:bg-white/5">About</a>
+        <a href="/faq" className="rounded-lg px-2 py-2 hover:bg-white/5">FAQ</a>
+        <a href="/feedback" className="rounded-lg px-2 py-2 hover:bg-white/5">Feedback</a>
         <a href="/chat" className="rounded-lg px-2 py-2 hover:bg-white/5">Live chat</a>
         <a href="/auth/signin" className="rounded-lg px-2 py-2 hover:bg-white/5">Staff sign in</a>
       </nav>}
     </header>
     <ClientPortal title={title} setTitle={setTitle} step={step} setStep={setStep} track={track} setTrack={setTrack} scope={scope} setScope={setScope} scopeText={scopeText} brief={brief} setBrief={setBrief} contact={contact} setContact={setContact} urgency={urgency} setUrgency={setUrgency} file={file} setFile={selectFile} sent={sent} dispatch={dispatch} reset={reset} submitting={submitting} error={error} ticketId={ticketId} />
+    <SiteFooter />
   </main>
 }
 

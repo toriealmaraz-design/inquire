@@ -181,3 +181,15 @@ export const complaints = pgTable('complaints', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Public customer feedback / testimonials (anyone can submit; admins moderate)
+export const testimonials = pgTable('testimonials', {
+  id: serial('id').primaryKey(),
+  name: varchar('name', { length: 120 }).notNull(),
+  role: varchar('role', { length: 120 }),
+  rating: integer('rating').notNull().default(5),
+  body: text('body').notNull(),
+  status: varchar('status', { length: 20 }).notNull().default('pending'), // 'pending' | 'approved' | 'hidden'
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+export type Testimonial = typeof testimonials.$inferSelect

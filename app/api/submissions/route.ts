@@ -173,7 +173,9 @@ export async function PATCH(request: Request) {
           const [cfg] = await db.select({ pct: settings.commissionPercent }).from(settings).where(eq(settings.id, 1)).limit(1)
           const c = Math.round(price * Number(cfg?.pct ?? 10)) / 100
           if (existing.assignedTo) set.commissionGhs = c.toFixed(2)
-          if (existing.referredBy) set.referralCommissionGhs = c.toFixed(2)
+          // No referral commission when the referrer is also the assignee (no double-dip).
+          if (existing.referredBy && existing.referredBy !== existing.assignedTo) set.referralCommissionGhs = c.toFixed(2)
+          else if (existing.referredBy) set.referralCommissionGhs = null
         } else return NextResponse.json({ error: 'Invalid price.' }, { status: 400 })
       }
       if (f.unpay === true) set.paidAt = null
@@ -209,7 +211,9 @@ export async function PATCH(request: Request) {
           status: 'Assigned',
           priceGhs: price.toFixed(2),
           commissionGhs: commission.toFixed(2),
-          referralCommissionGhs: existing.referredBy ? commission.toFixed(2) : null,
+          // Referral commission only when a DIFFERENT agent referred the client via their link.
+          // An agent assigned to their own referral never double-dips.
+          referralCommissionGhs: existing.referredBy && existing.referredBy !== agent.id ? commission.toFixed(2) : null,
         })
         .where(eq(submissions.id, id))
         .returning()
@@ -235,7 +239,7 @@ export async function PATCH(request: Request) {
         .where(eq(submissions.id, id))
         .returning()
 
-      const notify = [existing.assignedTo, existing.referredBy].filter((v): v is number => !!v)
+      const notify = [...new Set([existing.assignedTo, existing.referredBy].filter((v): v is number => !!v))]
       sendPush(
         { userIds: notify },
         { title: `Commission earned on ${existing.ticketId}`, body: `GHS ${Number(existing.commissionGhs).toFixed(2)} is now in your earnings.`, url: '/agent/dashboard' }

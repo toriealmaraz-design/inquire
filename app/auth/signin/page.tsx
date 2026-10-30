@@ -4,8 +4,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useState } from 'react'
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { BrandLogo } from '@/components/branding'
 
-const logoUrl = 'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
 
 const ERROR_MESSAGES: Record<string, string> = {
   account_lookup_failed: "You're signed in with Google, but we couldn't load your account. The server can't reach the database right now. Please try again in a minute.",
@@ -159,7 +159,7 @@ function AuthContent() {
       <div className="w-full max-w-md border border-white/15 bg-white/[0.06] backdrop-blur-2xl shadow-2xl shadow-black/30 rounded-3xl p-8">
         {/* Logo & Header */}
         <div className="text-center">
-          <img src={logoUrl} alt="Gemini Nexus" className="mx-auto size-16 rounded-2xl object-cover shadow-lg" />
+          <BrandLogo alt="Gemini Nexus" className="mx-auto size-16 rounded-2xl object-cover shadow-lg" />
           <h1 className="mt-5 text-2xl font-bold text-white">
             {mode === 'signin' ? 'Welcome back' : 'Create account'}
           </h1>
