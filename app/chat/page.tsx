@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, PhoneCall, Square } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square } from 'lucide-react'
+import { WebCall } from '@/components/web-call'
 import { createClient } from '@/lib/supabase/client'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
@@ -99,7 +100,7 @@ export default function ChatPage() {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const [recording, setRecording] = useState(false)
-  const [callMessage, setCallMessage] = useState('')
+
 
   const save = (next: Stored) => {
     setProfile(next)
@@ -326,11 +327,6 @@ export default function ChatPage() {
     }
   }
 
-  const startCall = () => {
-    window.location.href = 'tel:+233206478727'
-    setCallMessage('Calling our support line…')
-  }
-
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
@@ -404,13 +400,7 @@ export default function ChatPage() {
             <h1 className="truncate text-sm font-semibold">Gemini Nexus Support</h1>
             <p className={`truncate text-xs ${online ? 'text-emerald-400' : 'text-slate-400'}`} aria-live="polite">{statusText}</p>
           </div>
-          <button
-            onClick={startCall}
-            aria-label="Call support"
-            className="flex items-center gap-1.5 rounded-full border border-emerald-300/30 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-300/10"
-          >
-            <PhoneCall className="size-3" /> Call
-          </button>
+          <WebCall conversationId={convoId} role="client" peerLabel="Gemini Nexus Support" />
           <button
             onClick={() => setEditingName((v) => !v)}
             aria-expanded={editingName}

@@ -9,6 +9,7 @@ import { SupportPresence } from '@/components/support-presence'
 import { RoleWatcher } from '@/components/role-watcher'
 import { superDelete } from '@/lib/admin-delete'
 import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen } from 'lucide-react'
+import { WebCall } from '@/components/web-call'
 
 type User = {
   id?: string
@@ -344,6 +345,9 @@ export function AgentChatClient({ user }: { user: User }) {
             <div>
               <p className="font-medium text-white">{activeConvoData?.clientName}</p>
               <p className="text-xs text-emerald-400">Live</p>
+            </div>
+            <div className="ml-auto">
+              <WebCall conversationId={activeConvo} role="agent" peerLabel={activeConvoData?.clientName || 'the client'} />
             </div>
           </header>
 
