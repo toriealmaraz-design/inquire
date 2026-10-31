@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { PushPrompt } from '@/components/push-prompt'
@@ -11,8 +11,8 @@ import { Leaderboard } from '@/components/leaderboard'
 import { ChatbotSettings } from '@/components/chatbot-settings'
   import { AssetManager } from '@/components/asset-manager'
 import { FeedbackManager } from '@/components/feedback-manager'
+import { UsersPanel } from '@/components/users-panel'
 import { RoleWatcher } from '@/components/role-watcher'
-import { ProfileCard } from '@/components/profile-card'
 import { AnalyticsBoard } from '@/components/analytics-board'
 import { BriefEditor } from '@/components/brief-editor'
 import { ComplaintsInbox } from '@/components/complaints'
@@ -161,6 +161,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [openProfile, setOpenProfile] = useState<number | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
   const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'academic' | 'media' | 'systems'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
   const [supabase] = useState(() => createClient())
@@ -372,10 +373,11 @@ export function DashboardClient({ user }: { user: User }) {
     .map((f) => ({
       ...f,
       briefs: f.briefs.filter((s) =>
-        subFilter === 'open' ? !s.assignedTo && !s.paidAt : subFilter === 'assigned' ? !!s.assignedTo && !s.paidAt : subFilter === 'paid' ? !!s.paidAt : true
+        (subFilter === 'open' ? !s.assignedTo && !s.paidAt : subFilter === 'assigned' ? !!s.assignedTo && !s.paidAt : subFilter === 'paid' ? !!s.paidAt : true)
+        && (typeFilter === 'all' || s.category === typeFilter)
       ),
     }))
-    .filter((f) => (subFilter === 'all' || f.briefs.length > 0))
+    .filter((f) => (subFilter === 'all' && typeFilter === 'all') || f.briefs.length > 0)
     .filter((f) => {
       const q = subSearch.trim().toLowerCase()
       if (!q) return true
@@ -529,163 +531,17 @@ export function DashboardClient({ user }: { user: User }) {
 
           {/* User Management Tab (Super Admin only) */}
           {tab === 'User Management' && isSuperAdmin && (
-            <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="font-bold">All Users</h2>
-                  <p className="mt-1 text-xs text-slate-500">Approve pending users and assign roles.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 text-xs">
-                    {activeCount} active
-                  </span>
-                  {pendingCount > 0 && (
-                    <span className="px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 text-xs">
-                      {pendingCount} pending
-                    </span>
-                  )}
-                </div>
-              </div>
-
-              {loading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="size-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
-                </div>
-              ) : users.length === 0 ? (
-                <p className="text-center py-12 text-slate-500">No users yet</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[820px] text-left text-sm">
-                    <thead className="border-b border-white/10 text-[11px] uppercase tracking-wider text-slate-500">
-                      <tr>
-                        <th className="pb-3">User</th>
-                        <th className="pb-3">Email</th>
-                        <th className="pb-3">Role</th>
-                        <th className="pb-3">Field</th>
-                        <th className="pb-3">Status</th>
-                        <th className="pb-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map(u => (
-                        <Fragment key={u.id}>
-                        <tr className="border-b border-white/5">
-                          <td className="py-4">
-                            <div className="flex items-center gap-3">
-                              {u.avatar ? (
-                                <img src={u.avatar} alt="" className="size-8 rounded-full" />
-                              ) : (
-                                <div className="size-8 rounded-full bg-slate-600 flex items-center justify-center text-xs">
-                                  {u.name[0]}
-                                </div>
-                              )}
-                              <div className="min-w-0">
-                                <span className="block font-medium">{u.name}</span>
-                                {u.status === 'active' && u.role !== 'super_admin' && (
-                                  u.onboardedAt ? (
-                                    <button onClick={() => setOpenProfile(openProfile === u.id ? null : u.id)} className="text-[11px] text-cyan-300 hover:underline">
-                                      {openProfile === u.id ? 'Hide profile' : 'View skills profile'}
-                                    </button>
-                                  ) : (
-                                    <span className="text-[11px] text-amber-300/80">Questionnaire not done yet</span>
-                                  )
-                                )}
-                              </div>
-                            </div>
-                          </td>
-                          <td className="py-4 text-slate-400">{u.email}</td>
-                          <td className="py-4">
-                            <select
-                              value={u.role || ''}
-                              onChange={e => updateUser(u.id, { role: e.target.value || null } as any)}
-                              className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-xs text-white"
-                            >
-                              <option value="" className="bg-slate-900">Unassigned</option>
-                              {ROLES.map(r => (
-                                <option key={r.value} value={r.value} className="bg-slate-900">
-                                  {r.label}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-4">
-                            <select
-                              value={u.field || ''}
-                              onChange={e => updateUser(u.id, { field: e.target.value || null })}
-                              aria-label={`Field for ${u.name}`}
-                              className="rounded-lg border border-white/10 bg-white/10 px-2 py-1.5 text-xs text-white"
-                            >
-                              <option value="" className="bg-slate-900">Unassigned</option>
-                              {FIELDS.map(f => (
-                                <option key={f.value} value={f.value} className="bg-slate-900">{f.label}</option>
-                              ))}
-                            </select>
-                          </td>
-                          <td className="py-4">
-                            <span className={`rounded-full px-2 py-1 text-[11px] ${
-                              u.status === 'active' ? 'bg-emerald-500/20 text-emerald-300' :
-                              u.status === 'pending' ? 'bg-amber-500/20 text-amber-300' :
-                              'bg-rose-500/20 text-rose-300'
-                            }`}>
-                              {u.status === 'disabled' ? 'removed' : u.status}
-                            </span>
-                          </td>
-                          <td className="py-4">
-                            <div className="flex gap-2">
-                              {u.status === 'pending' && (
-                                <>
-                                  <button
-                                    onClick={() => updateUser(u.id, { status: 'active' })}
-                                    className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
-                                  >
-                                    <UserCheck className="size-3" /> Approve
-                                  </button>
-                                  <button
-                                    onClick={() => confirmStatus(u, 'rejected', `Reject ${u.name}'s request?`)}
-                                    className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/30"
-                                  >
-                                    <UserX className="size-3" /> Reject
-                                  </button>
-                                </>
-                              )}
-                              {u.status === 'active' && u.role !== 'super_admin' && (
-                                <button
-                                  onClick={() => confirmStatus(u, 'disabled', `Remove ${u.name} from the team? They lose access immediately.`)}
-                                  className="flex items-center gap-1 rounded-lg bg-rose-500/20 px-2 py-1 text-xs text-rose-300 hover:bg-rose-500/30"
-                                >
-                                  <UserX className="size-3" /> Remove
-                                </button>
-                              )}
-                              {(u.status === 'disabled' || u.status === 'rejected') && (
-                                <button
-                                  onClick={() => updateUser(u.id, { status: 'active' })}
-                                  className="flex items-center gap-1 rounded-lg bg-emerald-500/20 px-2 py-1 text-xs text-emerald-300 hover:bg-emerald-500/30"
-                                >
-                                  <Check className="size-3" /> Enable
-                                </button>
-                              )}
-                              {u.role !== 'super_admin' && (
-                                <button
-                                  onClick={async () => { if (await superDelete('user', [u.id], `Permanently delete ${u.name} (${u.email})? Their briefs stay but are unassigned. If they sign in again they'll start as a new pending account.`)) setUsers((rows) => rows.filter((r) => r.id !== u.id)) }}
-                                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-slate-500 hover:bg-rose-500/10 hover:text-rose-300"
-                                  title="Delete permanently"
-                                ><Trash2 className="size-3" /> Delete</button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                        {openProfile === u.id && u.profile && (
-                          <tr className="border-b border-white/5 bg-white/[0.03]">
-                            <td colSpan={6} className="p-4"><ProfileCard profile={u.profile} /></td>
-                          </tr>
-                        )}
-                        </Fragment>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
+            <UsersPanel
+              users={users}
+              loading={loading}
+              activeCount={activeCount}
+              pendingCount={pendingCount}
+              openProfile={openProfile}
+              setOpenProfile={setOpenProfile}
+              onUpdate={(id, updates) => updateUser(id, updates as any)}
+              onConfirmStatus={(u, status, question) => confirmStatus(u as any, status, question)}
+              onDelete={async (u) => { if (await superDelete('user', [u.id], `Permanently delete ${u.name} (${u.email})? Their briefs stay but are unassigned. If they sign in again they will start as a new pending account.`)) setUsers((rows) => rows.filter((r) => r.id !== u.id)) }}
+            />
           )}
 
           {/* Submissions Tab */}
@@ -710,20 +566,29 @@ export function DashboardClient({ user }: { user: User }) {
                     ))}
                   </div>
                 </div>
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-5 flex flex-col gap-3">
                   <input
                     value={subSearch}
                     onChange={(e) => setSubSearch(e.target.value)}
                     placeholder="Search client, contact, ticket, file…"
                     aria-label="Search clients"
-                    className="h-10 flex-1 rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
+                    className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500/50"
                   />
-                  <div className="flex rounded-xl bg-white/5 p-1 text-xs">
-                    {(['all', 'open', 'assigned', 'paid'] as const).map((f) => (
-                      <button key={f} onClick={() => setSubFilter(f)} className={`rounded-lg px-3 py-1.5 capitalize ${subFilter === f ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-                        {f}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap rounded-xl bg-white/5 p-1 text-xs">
+                      {(['all', 'open', 'assigned', 'paid'] as const).map((f) => (
+                        <button key={f} onClick={() => setSubFilter(f)} className={`rounded-lg px-3 py-1.5 capitalize ${subFilter === f ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                          {f}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap rounded-xl bg-white/5 p-1 text-xs">
+                      {([['all', 'All types'], ['academic', 'Academic'], ['media', 'Visuals'], ['systems', 'Systems']] as const).map(([v, label]) => (
+                        <button key={v} onClick={() => setTypeFilter(v)} className={`rounded-lg px-3 py-1.5 ${typeFilter === v ? 'bg-violet-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
