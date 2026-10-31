@@ -60,6 +60,12 @@ const selectCls = 'w-full rounded-lg border border-white/10 bg-white/10 px-2 py-
 
 export function UsersPanel({ users, loading, activeCount, pendingCount, openProfile, setOpenProfile, onUpdate, onConfirmStatus, onDelete }: Props) {
   const [groupBy, setGroupBy] = useState<GroupBy>('field')
+  const [query, setQuery] = useState('')
+
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? users.filter((u) => `${u.name} ${u.email} ${roleLabel(u.role)} ${fieldLabel(u.field)} ${u.status}`.toLowerCase().includes(q))
+    : users
 
   // Build groups, keeping a stable, meaningful order.
   const order = groupBy === 'field'
@@ -70,7 +76,7 @@ export function UsersPanel({ users, loading, activeCount, pendingCount, openProf
     ? ['Pending', 'Active', 'Removed', 'Rejected']
     : ['All users']
   const map = new Map<string, PanelUser[]>()
-  for (const u of users) {
+  for (const u of filtered) {
     const k = keyOf(u, groupBy)
     if (!map.has(k)) map.set(k, [])
     map.get(k)!.push(u)
@@ -93,13 +99,22 @@ export function UsersPanel({ users, loading, activeCount, pendingCount, openProf
         </div>
       </div>
 
-      {/* Group-by control */}
-      <div className="mt-4 flex flex-wrap gap-1.5 rounded-xl bg-white/5 p-1 text-xs sm:w-fit">
-        {GROUPS.map((g) => (
-          <button key={g.value} onClick={() => setGroupBy(g.value)} className={`rounded-lg px-3 py-1.5 ${groupBy === g.value ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}>
-            {g.label}
-          </button>
-        ))}
+      {/* Search + group-by controls */}
+      <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search name, email, role or skill…"
+          aria-label="Search users"
+          className="h-10 w-full rounded-xl border border-white/10 bg-white/5 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-500/50 sm:max-w-xs"
+        />
+        <div className="flex flex-wrap gap-1.5 rounded-xl bg-white/5 p-1 text-xs">
+          {GROUPS.map((g) => (
+            <button key={g.value} onClick={() => setGroupBy(g.value)} className={`rounded-lg px-3 py-1.5 ${groupBy === g.value ? 'bg-cyan-500 text-white' : 'text-slate-400 hover:text-white'}`}>
+              {g.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
