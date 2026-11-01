@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square, Search, ChevronDown } from 'lucide-react'
 import { WebCall } from '@/components/web-call'
+import { Lightbox } from '@/components/lightbox'
 import { createClient } from '@/lib/supabase/client'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
@@ -100,6 +101,35 @@ export default function ChatPage() {
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
   const [recording, setRecording] = useState(false)
+  const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
+  const [peerTyping, setPeerTyping] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  const [unseen, setUnseen] = useState(0)
+  const [showSearch, setShowSearch] = useState(false)
+  const [search, setSearch] = useState('')
+  const chRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null)
+  const atBottomRef = useRef(true)
+  const typingSentRef = useRef(0)
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    atBottomRef.current = near
+    setAtBottom(near)
+    if (near) setUnseen(0)
+  }
+  const jumpToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    setUnseen(0)
+  }
+  const emitTyping = () => {
+    const now = Date.now()
+    if (now - typingSentRef.current > 1500) {
+      typingSentRef.current = now
+      chRef.current?.send({ type: 'broadcast', event: 'typing', payload: { sender: 'client' } })
+    }
+  }
 
 
   const save = (next: Stored) => {
@@ -184,26 +214,38 @@ export default function ChatPage() {
       })
 
     const filter = `conversation_id=eq.${convoId}`
+    let typingTimer: ReturnType<typeof setTimeout>
     const channel = supabase
       .channel(`chat-client-${convoId}`)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter }, (payload) => {
         const r = payload.new as DbMessage
         setMessages((prev) => (prev.some((m) => m.id === r.id) ? prev : [...prev, rowToMessage(r)]))
+        if (!atBottomRef.current && r.sender_type !== 'client') setUnseen((n) => n + 1)
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter }, (payload) => {
         const r = payload.new as DbMessage
         setMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, read: r.read ?? m.read } : m)))
       })
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload?.sender === 'agent') {
+          setPeerTyping(true)
+          clearTimeout(typingTimer)
+          typingTimer = setTimeout(() => setPeerTyping(false), 2500)
+        }
+      })
       .subscribe()
+    chRef.current = channel
 
     return () => {
       active = false
+      clearTimeout(typingTimer)
+      chRef.current = null
       supabase.removeChannel(channel)
     }
   }, [convoId, supabase])
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    if (atBottomRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages, uploadName])
 
   // Auto-grow the composer
@@ -370,19 +412,22 @@ export default function ChatPage() {
     if (convoId && supabase) await supabase.from('conversations').update({ client_name: displayName(next) }).eq('id', convoId)
   }
 
-  // Group messages under day headers
+  // Group messages under day headers (filtered by in-chat search)
   const groups = useMemo(() => {
+    const term = search.trim().toLowerCase()
+    const list = term ? messages.filter((m) => m.text.toLowerCase().includes(term)) : messages
     const out: { day: string; items: Message[] }[] = []
-    for (const m of messages) {
+    for (const m of list) {
       const day = dayLabel(m.createdAt)
       if (out.at(-1)?.day !== day) out.push({ day, items: [] })
       out.at(-1)!.items.push(m)
     }
     return out
-  }, [messages])
+  }, [messages, search])
 
-  const statusText =
-    online === null ? 'Connecting…' : online ? 'Online now · usually replies in minutes' : "Away · leave a message, we'll reply here"
+  const statusText = peerTyping
+    ? 'typing…'
+    : online === null ? 'Connecting…' : online ? 'Online now · usually replies in minutes' : "Away · leave a message, we'll reply here"
 
   return (
     <main className="flex h-[100dvh] flex-col bg-[#06121d] text-white">
@@ -398,8 +443,9 @@ export default function ChatPage() {
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-sm font-semibold">Gemini Nexus Support</h1>
-            <p className={`truncate text-xs ${online ? 'text-emerald-400' : 'text-slate-400'}`} aria-live="polite">{statusText}</p>
+            <p className={`truncate text-xs ${peerTyping ? 'text-cyan-300' : online ? 'text-emerald-400' : 'text-slate-400'}`} aria-live="polite">{statusText}</p>
           </div>
+          <button onClick={() => { setShowSearch((v) => !v); setSearch('') }} aria-label="Search messages" className="rounded-full p-2 text-slate-400 hover:bg-white/5 hover:text-cyan-300"><Search className="size-4" /></button>
           <WebCall conversationId={convoId} role="client" peerLabel="Gemini Nexus Support" />
           <button
             onClick={() => setEditingName((v) => !v)}
@@ -432,10 +478,19 @@ export default function ChatPage() {
             </button>
           </div>
         )}
+        {showSearch && (
+          <div className="mx-auto flex max-w-3xl items-center gap-2 px-4 pb-3">
+            <div className="relative flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} autoFocus placeholder="Search in this chat…" aria-label="Search messages" className="h-9 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 text-sm outline-none focus:border-cyan-500/50" />
+            </div>
+            <button onClick={() => { setShowSearch(false); setSearch('') }} aria-label="Close search" className="rounded-full p-1.5 text-slate-400 hover:bg-white/5 hover:text-white"><X className="size-4" /></button>
+          </div>
+        )}
       </header>
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-5">
+      <div ref={scrollRef} onScroll={onScroll} className="relative flex-1 overflow-y-auto px-4 py-5">
         <div className="mx-auto flex max-w-3xl flex-col gap-2">
           {messages.length === 0 && (
             <div className="flex justify-start">
@@ -497,17 +552,21 @@ export default function ChatPage() {
                           <audio controls preload="metadata" src={audio.url} className="max-w-full" />
                         </div>
                       ) : file ? (
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="block">
-                          {file.isImage && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={file.url} alt={file.name} loading="lazy" className="mb-2 max-h-64 w-full rounded-xl object-cover" />
-                          )}
-                          <span className="flex items-center gap-3 rounded-xl bg-black/20 p-2.5">
-                            <FileText className="size-5 shrink-0 text-cyan-300" />
-                            <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
-                            <Download className="size-4 shrink-0 text-slate-300" />
-                          </span>
-                        </a>
+                        file.isImage ? (
+                          <div>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={file.url} alt={file.name} loading="lazy" onClick={() => setLightbox({ url: file.url, name: file.name })} className="mb-1 max-h-64 w-full cursor-zoom-in rounded-xl object-cover" />
+                            <span className="flex items-center gap-2 text-xs text-slate-300"><FileText className="size-3.5 shrink-0 text-cyan-300" /><span className="min-w-0 flex-1 truncate">{file.name}</span><a href={file.url} target="_blank" rel="noopener noreferrer" aria-label="Download"><Download className="size-3.5 shrink-0" /></a></span>
+                          </div>
+                        ) : (
+                          <a href={file.url} target="_blank" rel="noopener noreferrer" className="block">
+                            <span className="flex items-center gap-3 rounded-xl bg-black/20 p-2.5">
+                              <FileText className="size-5 shrink-0 text-cyan-300" />
+                              <span className="min-w-0 flex-1 truncate text-sm">{file.name}</span>
+                              <Download className="size-4 shrink-0 text-slate-300" />
+                            </span>
+                          </a>
+                        )
                       ) : (
                         <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                           <Linkified text={m.text} />
@@ -565,7 +624,7 @@ export default function ChatPage() {
           <textarea
             ref={textRef}
             value={input}
-            onChange={(e) => setInput(e.target.value)}
+            onChange={(e) => { setInput(e.target.value); emitTyping() }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault()
@@ -597,6 +656,16 @@ export default function ChatPage() {
         </div>
         <p className="mx-auto mt-1.5 max-w-3xl text-center text-[10px] text-slate-500">Files up to 15 MB · kept for 7 days · only our admins can see them</p>
       </div>
+
+      {/* Jump to latest */}
+      {!atBottom && (
+        <button onClick={jumpToBottom} aria-label="Scroll to latest" className="fixed bottom-24 right-5 z-20 flex items-center gap-1 rounded-full bg-[#0f2847] px-3 py-2 text-xs text-white shadow-lg ring-1 ring-white/10 hover:bg-[#143055]">
+          <ChevronDown className="size-4" />
+          {unseen > 0 && <span className="flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold">{unseen}</span>}
+        </button>
+      )}
+
+      <Lightbox url={lightbox?.url ?? null} name={lightbox?.name} onClose={() => setLightbox(null)} />
     </main>
   )
 }

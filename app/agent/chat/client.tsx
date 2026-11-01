@@ -8,8 +8,9 @@ import { NotificationBell } from '@/components/notification-bell'
 import { SupportPresence } from '@/components/support-presence'
 import { RoleWatcher } from '@/components/role-watcher'
 import { superDelete } from '@/lib/admin-delete'
-import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen, Search, ChevronDown, X } from 'lucide-react'
 import { WebCall } from '@/components/web-call'
+import { Lightbox } from '@/components/lightbox'
 
 type User = {
   id?: string
@@ -69,6 +70,12 @@ function maskFiles(text: string, admin: boolean) {
   return !admin && text.startsWith('📎') ? '📎 A file was shared (visible to admins only)' : text
 }
 
+// "📎 name\nurl" where url is an image -> {url, name}
+function imageOf(text: string): { url: string; name: string } | null {
+  const m = text.match(/^📎 (.+)\n(https?:\/\/\S+)$/)
+  return m && /\.(png|jpe?g|gif|webp|avif)$/i.test(m[1]) ? { url: m[2], name: m[1] } : null
+}
+
 function renderContent(text: string) {
   const parts = text.split(/(https?:\/\/[^\s]+)/g)
   return parts.map((part, i) =>
@@ -94,10 +101,39 @@ export function AgentChatClient({ user }: { user: User }) {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [lightbox, setLightbox] = useState<{ url: string; name?: string } | null>(null)
+  const [peerTyping, setPeerTyping] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+  const [unseen, setUnseen] = useState(0)
+  const [showSearch, setShowSearch] = useState(false)
+  const [search, setSearch] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeConvoRef = useRef<number | null>(null)
   activeConvoRef.current = activeConvo
+  const typingChRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
+  const atBottomRef = useRef(true)
+  const typingSentRef = useRef(0)
+
+  const onScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const near = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    atBottomRef.current = near
+    setAtBottom(near)
+    if (near) setUnseen(0)
+  }
+  const jumpToBottom = () => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    setUnseen(0)
+  }
+  const emitTyping = () => {
+    const now = Date.now()
+    if (now - typingSentRef.current > 1500) {
+      typingSentRef.current = now
+      typingChRef.current?.send({ type: 'broadcast', event: 'typing', payload: { sender: 'agent' } })
+    }
+  }
 
   const isAdmin = user.role !== 'agent'
 
@@ -160,6 +196,7 @@ export function AgentChatClient({ user }: { user: User }) {
         scheduleReload()
         if (activeConvoRef.current === r.conversation_id) {
           setMessages((prev) => (prev.some((m) => m.id === r.id) ? prev : [...prev, rowToMessage(r)]))
+          if (!atBottomRef.current && r.sender_type === 'client') setUnseen((n) => n + 1)
         }
       })
       .subscribe()
@@ -198,8 +235,30 @@ export function AgentChatClient({ user }: { user: User }) {
   }, [activeConvo, supabase, loadConversations])
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+    if (atBottomRef.current) scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
+
+  // Per-conversation typing channel (shared name with the client side)
+  useEffect(() => {
+    setPeerTyping(false)
+    setUnseen(0)
+    atBottomRef.current = true
+    setAtBottom(true)
+    if (!activeConvo) return
+    let typingTimer: ReturnType<typeof setTimeout>
+    const ch = supabase
+      .channel(`chat-client-${activeConvo}`)
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload?.sender === 'client') {
+          setPeerTyping(true)
+          clearTimeout(typingTimer)
+          typingTimer = setTimeout(() => setPeerTyping(false), 2500)
+        }
+      })
+      .subscribe()
+    typingChRef.current = ch
+    return () => { clearTimeout(typingTimer); typingChRef.current = null; supabase.removeChannel(ch) }
+  }, [activeConvo, supabase])
 
   const send = async () => {
     const text = input.trim()
@@ -333,7 +392,7 @@ export function AgentChatClient({ user }: { user: User }) {
 
       {/* Chat area */}
       {activeConvo ? (
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="relative flex min-w-0 flex-1 flex-col">
           {/* Chat header */}
           <header className="px-4 py-3 border-b border-white/10 bg-[#0a1929] flex items-center gap-3">
             <button onClick={() => setActiveConvo(null)} aria-label="Back to conversations" className="-ml-1 rounded-full p-1 text-slate-400 hover:bg-white/10 lg:hidden">
@@ -342,23 +401,36 @@ export function AgentChatClient({ user }: { user: User }) {
             <div className="size-10 rounded-full bg-slate-600 flex items-center justify-center text-white font-bold">
               C
             </div>
-            <div>
-              <p className="font-medium text-white">{activeConvoData?.clientName}</p>
-              <p className="text-xs text-emerald-400">Live</p>
+            <div className="min-w-0">
+              <p className="truncate font-medium text-white">{activeConvoData?.clientName}</p>
+              <p className={`text-xs ${peerTyping ? 'text-cyan-300' : 'text-emerald-400'}`}>{peerTyping ? 'typing…' : 'Live'}</p>
             </div>
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <button onClick={() => { setShowSearch((v) => !v); setSearch('') }} aria-label="Search messages" className="rounded-full p-2 text-slate-400 hover:bg-white/10 hover:text-cyan-300"><Search className="size-4" /></button>
               <WebCall conversationId={activeConvo} role="agent" peerLabel={activeConvoData?.clientName || 'the client'} />
             </div>
           </header>
+          {showSearch && (
+            <div className="flex items-center gap-2 border-b border-white/10 bg-[#0a1929] px-4 py-2">
+              <div className="relative flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
+                <input value={search} onChange={(e) => setSearch(e.target.value)} autoFocus placeholder="Search in this chat…" aria-label="Search messages" className="h-9 w-full rounded-xl border border-white/10 bg-white/5 pl-9 pr-3 text-sm text-white outline-none focus:border-cyan-500/50" />
+              </div>
+              <button onClick={() => { setShowSearch(false); setSearch('') }} aria-label="Close search" className="rounded-full p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
+            </div>
+          )}
 
           {/* Messages */}
           <div
             ref={scrollRef}
-            className="flex-1 overflow-y-auto p-4"
+            onScroll={onScroll}
+            className="relative flex-1 overflow-y-auto p-4"
             style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.02\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}
           >
             <div className="flex flex-col gap-2 max-w-2xl mx-auto">
-              {messages.map((m) => (
+              {messages.filter((m) => !search.trim() || m.text.toLowerCase().includes(search.trim().toLowerCase())).map((m) => {
+                const img = isAdminUser ? imageOf(m.text) : null
+                return (
                 <div
                   key={m.id}
                   className={`flex ${m.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
@@ -371,7 +443,15 @@ export function AgentChatClient({ user }: { user: User }) {
                     }`}
                   >
                     {m.bot && <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80">Auto-reply</p>}
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(maskFiles(m.text, isAdminUser))}</p>
+                    {img ? (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={img.url} alt={img.name} loading="lazy" onClick={() => setLightbox({ url: img.url, name: img.name })} className="mb-1 max-h-64 max-w-full cursor-zoom-in rounded-lg object-cover" />
+                        <p className="truncate text-xs text-slate-300">{img.name}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(maskFiles(m.text, isAdminUser))}</p>
+                    )}
                     <div className={`flex items-center gap-1 mt-1 ${m.sender === 'agent' ? 'justify-end' : ''}`}>
                       <span className="text-[10px] text-slate-400">{m.time}</span>
                       {m.sender === 'agent' && (
@@ -387,9 +467,17 @@ export function AgentChatClient({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           </div>
+
+          {!atBottom && (
+            <button onClick={jumpToBottom} aria-label="Scroll to latest" className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-full bg-[#0f2847] px-3 py-2 text-xs text-white shadow-lg ring-1 ring-white/10 hover:bg-[#143055]">
+              <ChevronDown className="size-4" />
+              {unseen > 0 && <span className="flex size-4 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold">{unseen}</span>}
+            </button>
+          )}
 
           {/* Input */}
           <div className="border-t border-white/10 bg-[#0a1929] px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
@@ -401,7 +489,7 @@ export function AgentChatClient({ user }: { user: User }) {
               <div className="flex-1 rounded-2xl bg-[#0f2847] border border-white/10">
                 <textarea
                   value={input}
-                  onChange={(e) => setInput(e.target.value)}
+                  onChange={(e) => { setInput(e.target.value); emitTyping() }}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && (e.preventDefault(), send())}
                   placeholder="Type a message"
                   rows={1}
@@ -427,6 +515,7 @@ export function AgentChatClient({ user }: { user: User }) {
           </div>
         </div>
       )}
+      <Lightbox url={lightbox?.url ?? null} name={lightbox?.name} onClose={() => setLightbox(null)} />
     </main>
   )
 }
