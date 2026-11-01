@@ -4,8 +4,7 @@ import { db } from '@/lib/db'
 import { settings } from '@/lib/db/schema'
 
 // The built-in logo used until the super admin uploads one in Settings.
-export const FALLBACK_LOGO =
-  'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
+export const FALLBACK_LOGO = '/brand/logo.png'
 
 export type Branding = { logoUrl: string; faviconUrl: string | null }
 

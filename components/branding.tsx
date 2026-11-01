@@ -2,8 +2,7 @@
 
 import { createContext, useContext } from 'react'
 
-const FALLBACK_LOGO =
-  'https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Gemini_Generated_Image_%20%283%29-PQcynfUuZ8MCE6lPljaeCegmfntVMi.png'
+const FALLBACK_LOGO = '/brand/logo.png'
 
 const BrandingContext = createContext<{ logoUrl: string }>({ logoUrl: FALLBACK_LOGO })
 

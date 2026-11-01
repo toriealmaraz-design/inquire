@@ -7,11 +7,10 @@ import { getBranding } from '@/lib/branding'
 
 const staticIcons: Metadata['icons'] = {
   icon: [
-    { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-    { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
+    { url: '/brand/favicon.png', type: 'image/png' },
     { url: '/icon.svg', type: 'image/svg+xml' },
   ],
-  apple: '/apple-icon.png',
+  apple: '/brand/apple-icon.png',
 }
 
 export async function generateMetadata(): Promise<Metadata> {
