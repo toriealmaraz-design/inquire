@@ -7,8 +7,9 @@ import { getBranding } from '@/lib/branding'
 
 const staticIcons: Metadata['icons'] = {
   icon: [
-    { url: '/brand/favicon.png', type: 'image/png' },
-    { url: '/icon.svg', type: 'image/svg+xml' },
+    { url: '/favicon.ico', sizes: '16x16 32x32 48x48' },
+    { url: '/brand/favicon-32.png', type: 'image/png', sizes: '32x32' },
+    { url: '/brand/favicon.png', type: 'image/png', sizes: '64x64' },
   ],
   apple: '/brand/apple-icon.png',
 }
