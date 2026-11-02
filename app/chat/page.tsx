@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square, Search, ChevronDown, MoreVertical, CornerUpLeft, Trash2 } from 'lucide-react'
 import { WebCall } from '@/components/web-call'
 import { Lightbox } from '@/components/lightbox'
+import { BrandLogo } from '@/components/branding'
 import { createClient } from '@/lib/supabase/client'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
@@ -508,7 +509,7 @@ export default function ChatPage() {
             <ArrowLeft className="size-5" />
           </a>
           <div className="relative">
-            <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 text-sm font-bold">GN</div>
+            <BrandLogo width={40} height={40} className="size-10 rounded-full object-cover" />
             <span className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-[#0a1929] ${online ? 'bg-emerald-400' : 'bg-slate-500'}`} />
           </div>
           <div className="min-w-0 flex-1">
@@ -579,7 +580,7 @@ export default function ChatPage() {
           )}
           {messages.length === 0 && (
             <div className="mx-auto mt-6 max-w-md text-center">
-              <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-cyan-400/20 to-indigo-500/20 text-xl font-bold text-cyan-200">GN</div>
+              <div className="mx-auto flex size-14 items-center justify-center overflow-hidden rounded-2xl"><BrandLogo width={56} height={56} className="size-14 rounded-2xl object-cover" /></div>
               <h2 className="mt-4 text-lg font-semibold">Chat with our team</h2>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 Tell us what you need. Attach your brief, slides or files with the clip. Replies appear here, so you can come back to this page any time on this device.

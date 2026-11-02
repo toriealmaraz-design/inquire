@@ -14,8 +14,9 @@ self.addEventListener('push', (event) => {
     Promise.all([
       self.registration.showNotification(title, {
         body: data.body || '',
-        icon: '/icon.svg',
-        badge: '/icon.svg',
+        icon: data.icon || '/brand/icon-192.png',
+        badge: '/brand/favicon.png',
+        image: data.image,
         tag: data.tag,
         renotify: !!data.tag,
         data: { url: data.url || '/dashboard' },

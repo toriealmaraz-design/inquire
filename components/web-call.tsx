@@ -184,6 +184,10 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
       send({ kind: 'offer', sdp: offer, callType: type, from: role })
+      // Always alert admins about an incoming call (push), not just those already on the chat page.
+      if (role === 'client' && conversationId) {
+        fetch('/api/chat/call-alert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId, callType: type }), keepalive: true }).catch(() => {})
+      }
     } catch (e) {
       cleanup()
       setError(e instanceof Error ? e.message : 'Could not start the call. Allow microphone/camera access.')
