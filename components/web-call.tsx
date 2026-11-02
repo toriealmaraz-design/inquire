@@ -243,7 +243,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
           <video ref={remoteMediaRef} autoPlay playsInline className={videoStage ? 'absolute inset-0 size-full object-cover' : 'hidden'} />
           {videoStage && <div className="absolute inset-0 bg-black/20" />}
           {/* Local camera preview */}
-          <video ref={localVideoRef} autoPlay playsInline muted className={videoStage ? 'absolute right-4 top-16 z-10 h-40 w-28 rounded-2xl border border-white/20 object-cover shadow-lg' : 'hidden'} />
+          <video ref={localVideoRef} autoPlay playsInline muted className={videoStage ? 'absolute right-4 top-16 z-10 h-40 w-28 rounded-2xl border border-white/20 object-cover shadow-lg sm:h-52 sm:w-40' : 'hidden'} />
 
           {/* Top status */}
           <div className="relative z-10 flex flex-col items-center px-6 pt-[max(2.5rem,env(safe-area-inset-top))]">
@@ -268,7 +268,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
           {/* Controls */}
           <div className="relative z-10 px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6">
             {status === 'incoming' ? (
-              <div className="flex items-end justify-around">
+              <div className="mx-auto flex w-full max-w-sm items-end justify-center gap-16">
                 <div className="flex flex-col items-center gap-2">
                   <button onClick={decline} className="flex size-16 items-center justify-center rounded-full bg-rose-500 shadow-lg hover:bg-rose-400" aria-label="Decline call"><PhoneOff className="size-7" /></button>
                   <span className="text-xs text-slate-300">Decline</span>
@@ -279,7 +279,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
                 </div>
               </div>
             ) : (
-              <div className="flex items-end justify-center gap-6">
+              <div className="mx-auto flex w-full max-w-md items-end justify-center gap-6 rounded-3xl bg-black/20 py-4 backdrop-blur-sm sm:gap-10">
                 {status === 'connected' && (
                   <div className="flex flex-col items-center gap-2">
                     <button onClick={toggleMute} className={`flex size-14 items-center justify-center rounded-full ${muted ? 'bg-white text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={muted ? 'Unmute' : 'Mute'}>
