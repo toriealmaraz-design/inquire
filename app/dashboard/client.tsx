@@ -18,7 +18,7 @@ import { BriefEditor } from '@/components/brief-editor'
 import { ComplaintsInbox } from '@/components/complaints'
 import { ContactSuperAdmin } from '@/components/contact-super-admin'
 import { superDelete } from '@/lib/admin-delete'
-import { FIELDS, briefTitle } from '@/lib/fields'
+import { briefTitle } from '@/lib/fields'
 import {
   BarChart3,
   Check,
@@ -27,8 +27,6 @@ import {
   Settings2,
   Users,
   Zap,
-  UserCheck,
-  UserX,
   Save,
   ShieldCheck,
   FileText,
@@ -128,14 +126,6 @@ function fmtSize(bytes: number | null) {
 }
 
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
-const ROLES = [
-  { value: 'super_admin', label: 'Super Admin' },
-  { value: 'academic_lead', label: 'Academic Lead' },
-  { value: 'it_graphics_lead', label: 'IT/Graphics Lead' },
-  { value: 'field_specialist', label: 'Field Specialist' },
-  { value: 'admin', label: 'Admin (basic)' },
-  { value: 'agent', label: 'Agent' },
-]
 
 export function DashboardClient({ user }: { user: User }) {
   const [tab, setTab] = useState('Overview')
@@ -220,7 +210,7 @@ export function DashboardClient({ user }: { user: User }) {
       .channel('dashboard-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'uploads' }, scheduleReload)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         scheduleReload()
       })
       .subscribe()

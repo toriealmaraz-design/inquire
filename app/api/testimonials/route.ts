@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq } from 'drizzle-orm'
+import { desc, eq } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { testimonials } from '@/lib/db/schema'
 import { getStaffUser, isAdmin } from '@/lib/auth'

@@ -103,7 +103,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
     const channel = supabase
       .channel('agent-dashboard')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, scheduleReload)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         scheduleReload()
       })
       .subscribe()

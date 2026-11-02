@@ -65,7 +65,7 @@ function createRinger() {
  * In-browser WebRTC voice/video call (WhatsApp-style) over a Supabase broadcast channel.
  * Both peers mount this with the same conversationId; one calls, the other gets a ringing banner.
  */
-export function WebCall({ conversationId, role, peerLabel = 'the other person' }: { conversationId: number | null; role: Role; peerLabel?: string }) {
+export function WebCall({ conversationId, role, peerLabel = 'the other person', peerActive = true }: { conversationId: number | null; role: Role; peerLabel?: string; peerActive?: boolean }) {
   const [status, setStatus] = useState<Status>('idle')
   const [callType, setCallType] = useState<CallType>('audio')
   const [muted, setMuted] = useState(false)
@@ -73,6 +73,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
+  const [peerPresent, setPeerPresent] = useState(false)
   useEffect(() => setMounted(true), [])
 
   const supabaseRef = useRef(createClient())
@@ -143,10 +144,19 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
   }, [])
 
   // Subscribe to the call channel for this conversation (needed to receive incoming calls).
+  // Presence on this channel tells us whether the OTHER party is currently active in this chat —
+  // calls are only allowed, and only ring, when both sides are present.
   useEffect(() => {
-    if (!conversationId) return
-    const ch = supabaseRef.current.channel(`call-${conversationId}`, { config: { broadcast: { self: false } } })
+    if (!conversationId) { setPeerPresent(false); return }
+    const ch = supabaseRef.current.channel(`call-${conversationId}`, {
+      config: { broadcast: { self: false }, presence: { key: role } },
+    })
     channelRef.current = ch
+    const syncPresence = () => {
+      const state = ch.presenceState() as Record<string, unknown[]>
+      // Any present member whose key is not our own role => the peer is here.
+      setPeerPresent(Object.keys(state).some((k) => k !== role))
+    }
     ch.on('broadcast', { event: 'signal' }, async ({ payload }: { payload: Signal }) => {
       const pc = pcRef.current
       try {
@@ -168,10 +178,14 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Call error')
       }
-    }).subscribe()
-    return () => { supabaseRef.current.removeChannel(ch); channelRef.current = null; cleanup() }
+    })
+      .on('presence', { event: 'sync' }, syncPresence)
+      .on('presence', { event: 'join' }, syncPresence)
+      .on('presence', { event: 'leave' }, syncPresence)
+      .subscribe((s) => { if (s === 'SUBSCRIBED') ch.track({ role, at: Date.now() }) })
+    return () => { supabaseRef.current.removeChannel(ch); channelRef.current = null; setPeerPresent(false); cleanup() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId])
+  }, [conversationId, role])
 
   const startCall = async (type: CallType) => {
     setError('')
@@ -184,10 +198,6 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
       send({ kind: 'offer', sdp: offer, callType: type, from: role })
-      // Always alert admins about an incoming call (push), not just those already on the chat page.
-      if (role === 'client' && conversationId) {
-        fetch('/api/chat/call-alert', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ conversationId, callType: type }), keepalive: true }).catch(() => {})
-      }
     } catch (e) {
       cleanup()
       setError(e instanceof Error ? e.message : 'Could not start the call. Allow microphone/camera access.')
@@ -226,18 +236,21 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
 
   const mmss = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
   const disabled = !conversationId
+  const peerLabelShort = role === 'client' ? 'an agent' : peerLabel
+  const callReady = !disabled && peerActive && peerPresent
+  const callBlockedReason = disabled ? 'Start a conversation first' : !callReady ? `Available when ${peerLabelShort} is active in this chat` : ''
   const isVideo = callType === 'video'
   const videoStage = isVideo && status === 'connected'
 
   return (
     <>
-      {/* Call trigger buttons (shown when idle) */}
+      {/* Call trigger buttons (shown when idle). Calls only work while both parties are active in the chat. */}
       {status === 'idle' && (
         <div className="flex items-center gap-1.5">
-          <button onClick={() => startCall('audio')} disabled={disabled} aria-label="Voice call" title={disabled ? 'Start a conversation first' : 'Voice call'} className="flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-300/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-300/25 disabled:opacity-40">
+          <button onClick={() => startCall('audio')} disabled={!callReady} aria-label="Voice call" title={callBlockedReason || 'Voice call'} className="flex items-center gap-1.5 rounded-full border border-emerald-300/40 bg-emerald-300/15 px-3 py-1.5 text-xs font-bold text-emerald-200 hover:bg-emerald-300/25 disabled:opacity-40">
             <Phone className="size-3.5" /> Call
           </button>
-          <button onClick={() => startCall('video')} disabled={disabled} aria-label="Video call" title={disabled ? 'Start a conversation first' : 'Video call'} className="flex size-8 items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-300/15 text-cyan-200 hover:bg-cyan-300/25 disabled:opacity-40">
+          <button onClick={() => startCall('video')} disabled={!callReady} aria-label="Video call" title={callBlockedReason || 'Video call'} className="flex size-8 items-center justify-center rounded-full border border-cyan-300/40 bg-cyan-300/15 text-cyan-200 hover:bg-cyan-300/25 disabled:opacity-40">
             <Video className="size-3.5" />
           </button>
         </div>
