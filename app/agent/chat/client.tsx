@@ -7,8 +7,7 @@ import { PushPrompt } from '@/components/push-prompt'
 import { NotificationBell } from '@/components/notification-bell'
 import { SupportPresence } from '@/components/support-presence'
 import { RoleWatcher } from '@/components/role-watcher'
-import { superDelete } from '@/lib/admin-delete'
-import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen, Search, ChevronDown, X } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, LogOut, Users, CheckCheck, BookOpen, Search, ChevronDown, X, MoreVertical, CornerUpLeft, CornerUpRight, Trash2, Pencil } from 'lucide-react'
 import { WebCall } from '@/components/web-call'
 import { Lightbox } from '@/components/lightbox'
 
@@ -21,13 +20,19 @@ type User = {
   field?: string | null
 }
 
+type Reactions = Record<string, string[]>
 type Message = {
   id: number
   text: string
   sender: 'agent' | 'client'
   bot?: boolean
   time: string
+  createdAt: string
   read?: boolean
+  replyTo?: number | null
+  editedAt?: string | null
+  deletedAt?: string | null
+  reactions?: Reactions | null
 }
 
 type DbMessage = {
@@ -38,6 +43,10 @@ type DbMessage = {
   content: string
   read: boolean | null
   created_at: string
+  reply_to?: number | null
+  edited_at?: string | null
+  deleted_at?: string | null
+  reactions?: Reactions | null
 }
 
 type Conversation = {
@@ -60,9 +69,16 @@ function rowToMessage(r: DbMessage): Message {
     sender: r.sender_type === 'client' ? 'client' : 'agent',
     bot: r.sender_type === 'bot',
     time: fmtTime(r.created_at),
+    createdAt: r.created_at,
     read: r.read ?? false,
+    replyTo: r.reply_to ?? null,
+    editedAt: r.edited_at ?? null,
+    deletedAt: r.deleted_at ?? null,
+    reactions: r.reactions ?? null,
   }
 }
+
+const REACTION_EMOJI = ['👍', '❤️', '😂', '😮', '🙏']
 
 // Agents never see client files; admins do
 const ADMIN_ROLE_LIST = ['super_admin', 'academic_lead', 'it_graphics_lead', 'field_specialist', 'admin']
@@ -107,6 +123,10 @@ export function AgentChatClient({ user }: { user: User }) {
   const [unseen, setUnseen] = useState(0)
   const [showSearch, setShowSearch] = useState(false)
   const [search, setSearch] = useState('')
+  const [menuFor, setMenuFor] = useState<number | null>(null)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [editing, setEditing] = useState<Message | null>(null)
+  const [forwarding, setForwarding] = useState<Message | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const activeConvoRef = useRef<number | null>(null)
@@ -133,6 +153,38 @@ export function AgentChatClient({ user }: { user: User }) {
       typingSentRef.current = now
       typingChRef.current?.send({ type: 'broadcast', event: 'typing', payload: { sender: 'agent' } })
     }
+  }
+
+  const react = async (m: Message, emoji: string) => {
+    setMenuFor(null)
+    const current: Reactions = { ...(m.reactions || {}) }
+    const who = 'agent'
+    const has = current[emoji]?.includes(who)
+    const next: Reactions = {}
+    for (const [e, arr] of Object.entries(current)) {
+      const filtered = arr.filter((x) => x !== who)
+      if (filtered.length) next[e] = filtered
+    }
+    if (!has) next[emoji] = [...(next[emoji] || []), who]
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reactions: next } : x)))
+    await supabase.from('messages').update({ reactions: next }).eq('id', m.id)
+  }
+  const unsend = async (m: Message) => {
+    setMenuFor(null)
+    if (!window.confirm('Delete this message for everyone?')) return
+    const now = new Date().toISOString()
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deletedAt: now } : x)))
+    await supabase.from('messages').update({ deleted_at: now }).eq('id', m.id)
+  }
+  const startEdit = (m: Message) => { setMenuFor(null); setReplyTo(null); setEditing(m); setInput(m.text) }
+  const startReply = (m: Message) => { setMenuFor(null); setEditing(null); setReplyTo(m) }
+  const forwardTo = async (targetConvo: number) => {
+    if (!forwarding) return
+    const content = forwarding.text
+    setForwarding(null)
+    await supabase.from('messages').insert({ conversation_id: targetConvo, sender_type: 'agent', sender_id: numericUserId, content, read: false })
+    await supabase.from('conversations').update({ updated_at: new Date().toISOString() }).eq('id', targetConvo)
+    loadConversations()
   }
 
   const isAdmin = user.role !== 'agent'
@@ -199,6 +251,12 @@ export function AgentChatClient({ user }: { user: User }) {
           if (!atBottomRef.current && r.sender_type === 'client') setUnseen((n) => n + 1)
         }
       })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+        const r = payload.new as DbMessage
+        if (activeConvoRef.current === r.conversation_id) {
+          setMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, ...rowToMessage(r) } : m)))
+        }
+      })
       .subscribe()
 
     return () => {
@@ -263,11 +321,22 @@ export function AgentChatClient({ user }: { user: User }) {
   const send = async () => {
     const text = input.trim()
     if (!text || !activeConvo || sending) return
+    // Editing an existing message
+    if (editing) {
+      setInput('')
+      const now = new Date().toISOString()
+      setMessages((prev) => prev.map((m) => (m.id === editing.id ? { ...m, text, editedAt: now } : m)))
+      await supabase.from('messages').update({ content: text, edited_at: now }).eq('id', editing.id)
+      setEditing(null)
+      return
+    }
     setSending(true)
     setInput('')
+    const replyId = replyTo ? replyTo.id : null
+    setReplyTo(null)
     const { data } = await supabase
       .from('messages')
-      .insert({ conversation_id: activeConvo, sender_type: 'agent', sender_id: numericUserId, content: text, read: false })
+      .insert({ conversation_id: activeConvo, sender_type: 'agent', sender_id: numericUserId, content: text, read: false, reply_to: replyId })
       .select('*')
       .single()
     if (data) {
@@ -429,11 +498,17 @@ export function AgentChatClient({ user }: { user: User }) {
           >
             <div className="flex flex-col gap-2 max-w-2xl mx-auto">
               {messages.filter((m) => !search.trim() || m.text.toLowerCase().includes(search.trim().toLowerCase())).map((m) => {
-                const img = isAdminUser ? imageOf(m.text) : null
+                const deleted = !!m.deletedAt
+                const img = deleted || !isAdminUser ? null : imageOf(m.text)
+                const mineA = m.sender === 'agent'
+                const replied = m.replyTo ? messages.find((x) => x.id === m.replyTo) : null
+                const reactions = m.reactions ? Object.entries(m.reactions).filter(([, arr]) => arr.length) : []
+                const canEdit = mineA && !deleted && !img && !m.text.startsWith('📎') && !m.text.startsWith('🎙️')
+                const canDelete = !deleted && (mineA || user.role === 'super_admin')
                 return (
                 <div
                   key={m.id}
-                  className={`flex ${m.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
+                  className={`group flex ${m.sender === 'agent' ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
                     className={`relative max-w-[85%] break-words sm:max-w-[70%] rounded-lg px-3 py-2 shadow-md ${
@@ -442,8 +517,16 @@ export function AgentChatClient({ user }: { user: User }) {
                         : 'bg-[#0f2847] text-slate-100 rounded-tl-none'
                     }`}
                   >
-                    {m.bot && <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80">Auto-reply</p>}
-                    {img ? (
+                    {m.bot && !deleted && <p className="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-cyan-200/80">Auto-reply</p>}
+                    {replied && (
+                      <div className="mb-1 rounded border-l-2 border-cyan-300/60 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
+                        <span className="block font-semibold text-cyan-200">{replied.sender === 'agent' ? 'You' : 'Client'}</span>
+                        <span className="block truncate">{replied.deletedAt ? 'deleted message' : maskFiles(replied.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 80)}</span>
+                      </div>
+                    )}
+                    {deleted ? (
+                      <p className="text-sm italic text-slate-400">🚫 This message was deleted</p>
+                    ) : img ? (
                       <>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img src={img.url} alt={img.name} loading="lazy" onClick={() => setLightbox({ url: img.url, name: img.name })} className="mb-1 max-h-64 max-w-full cursor-zoom-in rounded-lg object-cover" />
@@ -452,19 +535,43 @@ export function AgentChatClient({ user }: { user: User }) {
                     ) : (
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderContent(maskFiles(m.text, isAdminUser))}</p>
                     )}
+                    {reactions.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {reactions.map(([e, arr]) => (
+                          <button key={e} onClick={() => react(m, e)} className="rounded-full bg-black/30 px-1.5 py-0.5 text-[11px] hover:bg-black/40">{e} {arr.length}</button>
+                        ))}
+                      </div>
+                    )}
                     <div className={`flex items-center gap-1 mt-1 ${m.sender === 'agent' ? 'justify-end' : ''}`}>
+                      {m.editedAt && !deleted && <span className="text-[10px] text-slate-500">edited</span>}
                       <span className="text-[10px] text-slate-400">{m.time}</span>
-                      {m.sender === 'agent' && (
+                      {m.sender === 'agent' && !deleted && (
                         <CheckCheck className={`size-4 ${m.read ? 'text-cyan-400' : 'text-slate-500'}`} />
                       )}
-                      {user.role === 'super_admin' && typeof m.id === 'number' && (
-                        <button
-                          onClick={async () => { if (await superDelete('message', [m.id as number], 'Delete this message for everyone?')) setMessages((list) => list.filter((x) => x.id !== m.id)) }}
-                          className="ml-1 text-[10px] text-slate-500 hover:text-rose-300"
-                          aria-label="Delete message"
-                        >Delete</button>
-                      )}
                     </div>
+
+                    {!deleted && (
+                      <button
+                        onClick={() => setMenuFor(menuFor === m.id ? null : m.id)}
+                        aria-label="Message actions"
+                        className={`absolute top-1 opacity-0 transition group-hover:opacity-100 ${mineA ? '-left-7' : '-right-7'} rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white ${menuFor === m.id ? 'opacity-100' : ''}`}
+                      >
+                        <MoreVertical className="size-4" />
+                      </button>
+                    )}
+                    {menuFor === m.id && (
+                      <div className={`absolute top-7 z-30 w-40 rounded-xl border border-white/10 bg-[#0b1a28] p-1 shadow-2xl ${mineA ? 'right-0' : 'left-0'}`}>
+                        <div className="flex justify-between px-1 pb-1">
+                          {REACTION_EMOJI.map((e) => (
+                            <button key={e} onClick={() => react(m, e)} className="rounded-full p-1 text-lg hover:bg-white/10" aria-label={`React ${e}`}>{e}</button>
+                          ))}
+                        </div>
+                        <button onClick={() => startReply(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"><CornerUpLeft className="size-3.5" /> Reply</button>
+                        {isAdminUser && <button onClick={() => { setMenuFor(null); setForwarding(m) }} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"><CornerUpRight className="size-3.5" /> Forward</button>}
+                        {canEdit && <button onClick={() => startEdit(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"><Pencil className="size-3.5" /> Edit</button>}
+                        {canDelete && <button onClick={() => unsend(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-rose-300 hover:bg-rose-500/10"><Trash2 className="size-3.5" /> Delete</button>}
+                      </div>
+                    )}
                   </div>
                 </div>
                 )
@@ -481,6 +588,15 @@ export function AgentChatClient({ user }: { user: User }) {
 
           {/* Input */}
           <div className="border-t border-white/10 bg-[#0a1929] px-3 pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+            {(replyTo || editing) && (
+              <div className="mx-auto mb-2 flex max-w-2xl items-center gap-2 rounded-xl border-l-2 border-cyan-300/60 bg-white/5 px-3 py-2 text-xs">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold text-cyan-200">{editing ? 'Editing message' : `Replying to ${replyTo?.sender === 'agent' ? 'yourself' : 'client'}`}</p>
+                  <p className="truncate text-slate-400">{maskFiles((editing || replyTo)?.text || '', isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+                </div>
+                <button onClick={() => { setReplyTo(null); setEditing(null); setInput('') }} aria-label="Cancel" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
+              </div>
+            )}
             <div className="flex items-end gap-2 max-w-2xl mx-auto">
               {isAdminUser && <button onClick={() => fileInputRef.current?.click()} disabled={uploading} className="p-2 text-slate-400 hover:text-cyan-300 disabled:opacity-50">
                 <Paperclip className="size-5" />
@@ -512,6 +628,27 @@ export function AgentChatClient({ user }: { user: User }) {
           <div className="text-center">
             <Users className="size-16 mx-auto mb-4 opacity-50" />
             <p>Select a conversation to start chatting</p>
+          </div>
+        </div>
+      )}
+      {menuFor !== null && <button className="fixed inset-0 z-20 cursor-default" aria-label="Close menu" onClick={() => setMenuFor(null)} />}
+      {forwarding && (
+        <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={() => setForwarding(null)}>
+          <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1a28] p-4 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-bold">Forward to…</h3>
+              <button onClick={() => setForwarding(null)} aria-label="Close" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
+            </div>
+            <p className="mb-2 truncate rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400">{maskFiles(forwarding.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              {conversations.filter((c) => c.id !== activeConvo).map((c) => (
+                <button key={c.id} onClick={() => forwardTo(c.id)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">
+                  <span className="truncate">{c.clientName}</span>
+                  <CornerUpRight className="size-4 shrink-0 text-cyan-300" />
+                </button>
+              ))}
+              {conversations.filter((c) => c.id !== activeConvo).length === 0 && <p className="px-3 py-4 text-center text-xs text-slate-500">No other conversations.</p>}
+            </div>
           </div>
         </div>
       )}

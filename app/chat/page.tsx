@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
-import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square, Search, ChevronDown } from 'lucide-react'
+import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square, Search, ChevronDown, MoreVertical, CornerUpLeft, Trash2 } from 'lucide-react'
 import { WebCall } from '@/components/web-call'
 import { Lightbox } from '@/components/lightbox'
 import { createClient } from '@/lib/supabase/client'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
+type Reactions = Record<string, string[]>
 type Message = {
   id: number | string
   text: string
@@ -15,6 +16,10 @@ type Message = {
   createdAt: string
   read?: boolean
   pending?: boolean
+  replyTo?: number | null
+  editedAt?: string | null
+  deletedAt?: string | null
+  reactions?: Reactions | null
 }
 
 type DbMessage = {
@@ -24,6 +29,10 @@ type DbMessage = {
   content: string
   read: boolean | null
   created_at: string
+  reply_to?: number | null
+  edited_at?: string | null
+  deleted_at?: string | null
+  reactions?: Reactions | null
 }
 
 type Stored = { name: string; contact?: string; convoId: number | null; named?: boolean }
@@ -31,6 +40,7 @@ type Stored = { name: string; contact?: string; convoId: number | null; named?: 
 const STORAGE_KEY = 'inquire_client'
 const MAX_FILE_BYTES = 15 * 1024 * 1024
 const QUICK_STARTS = ['I need a quote for an assignment', 'I want to check on my brief', 'I have an urgent deadline']
+const REACTION_EMOJI = ['👍', '❤️', '😂', '😮', '🙏']
 
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
 
@@ -48,6 +58,10 @@ const rowToMessage = (r: DbMessage): Message => ({
   bot: r.sender_type === 'bot',
   createdAt: r.created_at,
   read: r.read ?? false,
+  replyTo: r.reply_to ?? null,
+  editedAt: r.edited_at ?? null,
+  deletedAt: r.deleted_at ?? null,
+  reactions: r.reactions ?? null,
 })
 
 // "📎 name\nurl" -> file card
@@ -107,6 +121,9 @@ export default function ChatPage() {
   const [unseen, setUnseen] = useState(0)
   const [showSearch, setShowSearch] = useState(false)
   const [search, setSearch] = useState('')
+  const [menuFor, setMenuFor] = useState<number | null>(null)
+  const [replyTo, setReplyTo] = useState<Message | null>(null)
+  const [editing, setEditing] = useState<Message | null>(null)
   const chRef = useRef<ReturnType<NonNullable<typeof supabase>['channel']> | null>(null)
   const atBottomRef = useRef(true)
   const typingSentRef = useRef(0)
@@ -129,6 +146,43 @@ export default function ChatPage() {
       typingSentRef.current = now
       chRef.current?.send({ type: 'broadcast', event: 'typing', payload: { sender: 'client' } })
     }
+  }
+
+  // Message actions (client can act on its own messages; react to any)
+  const react = async (m: Message, emoji: string) => {
+    if (!supabase || typeof m.id !== 'number') return
+    setMenuFor(null)
+    const current: Reactions = { ...(m.reactions || {}) }
+    const who = 'client'
+    const has = current[emoji]?.includes(who)
+    const next: Reactions = {}
+    for (const [e, arr] of Object.entries(current)) {
+      const filtered = arr.filter((x) => x !== who)
+      if (filtered.length) next[e] = filtered
+    }
+    if (!has) next[emoji] = [...(next[emoji] || []), who]
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, reactions: next } : x)))
+    await supabase.from('messages').update({ reactions: next }).eq('id', m.id)
+  }
+  const unsend = async (m: Message) => {
+    if (!supabase || typeof m.id !== 'number') return
+    setMenuFor(null)
+    if (!window.confirm('Delete this message for everyone?')) return
+    setMessages((prev) => prev.map((x) => (x.id === m.id ? { ...x, deletedAt: new Date().toISOString() } : x)))
+    await supabase.from('messages').update({ deleted_at: new Date().toISOString() }).eq('id', m.id)
+  }
+  const startEdit = (m: Message) => {
+    setMenuFor(null)
+    setReplyTo(null)
+    setEditing(m)
+    setInput(m.text)
+    textRef.current?.focus()
+  }
+  const startReply = (m: Message) => {
+    setMenuFor(null)
+    setEditing(null)
+    setReplyTo(m)
+    textRef.current?.focus()
   }
 
 
@@ -224,7 +278,7 @@ export default function ChatPage() {
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages', filter }, (payload) => {
         const r = payload.new as DbMessage
-        setMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, read: r.read ?? m.read } : m)))
+        setMessages((prev) => prev.map((m) => (m.id === r.id ? { ...m, ...rowToMessage(r), pending: false } : m)))
       })
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload?.sender === 'agent') {
@@ -272,12 +326,12 @@ export default function ChatPage() {
   }, [convoId, profile, supabase])
 
   // Returns the conversation id on success, or null
-  const postMessage = async (content: string, tmpId?: string): Promise<number | null> => {
+  const postMessage = async (content: string, tmpId?: string, replyToId?: number | null): Promise<number | null> => {
     if (!supabase) return null
     let id = await ensureConversation()
     if (!id) return null
     const insert = (cid: number) =>
-      supabase.from('messages').insert({ conversation_id: cid, sender_type: 'client', content, read: false }).select('*').single()
+      supabase.from('messages').insert({ conversation_id: cid, sender_type: 'client', content, read: false, reply_to: replyToId ?? null }).select('*').single()
     let { data, error } = await insert(id)
     // The saved conversation no longer exists (e.g. deleted by an admin): start a new one and resend
     if (error?.code === '23503') {
@@ -305,12 +359,28 @@ export default function ChatPage() {
     const text = (preset ?? input).trim()
     if (!text || sending) return
     if (!supabase) return setError('Chat is not available right now. Please submit a brief from the homepage instead.')
+
+    // Editing an existing message
+    if (editing && typeof editing.id === 'number') {
+      setSending(true)
+      setInput('')
+      const now = new Date().toISOString()
+      setMessages((prev) => prev.map((m) => (m.id === editing.id ? { ...m, text, editedAt: now } : m)))
+      await supabase.from('messages').update({ content: text, edited_at: now }).eq('id', editing.id)
+      setEditing(null)
+      setSending(false)
+      textRef.current?.focus()
+      return
+    }
+
     setSending(true)
     setError('')
     if (!preset) setInput('')
+    const replyId = replyTo && typeof replyTo.id === 'number' ? replyTo.id : null
+    setReplyTo(null)
     const tmpId = `tmp-${Date.now()}`
-    setMessages((prev) => [...prev, { id: tmpId, text, sender: 'user', createdAt: new Date().toISOString(), pending: true }])
-    const ok = await postMessage(text, tmpId)
+    setMessages((prev) => [...prev, { id: tmpId, text, sender: 'user', createdAt: new Date().toISOString(), pending: true, replyTo: replyId }])
+    const ok = await postMessage(text, tmpId, replyId)
     if (ok && online === false && botCfg.away && supabase) {
       const recentAway = messages.some((m) => m.bot && m.text === botCfg.away && Date.now() - Date.parse(m.createdAt) < 30 * 60_000)
       if (!recentAway) {
@@ -536,17 +606,29 @@ export default function ChatPage() {
               </div>
               {g.items.map((m) => {
                 const mine = m.sender === 'user'
-                const file = parseFile(m.text)
-                const audio = parseAudio(m.text)
+                const deleted = !!m.deletedAt
+                const file = deleted ? null : parseFile(m.text)
+                const audio = deleted ? null : parseAudio(m.text)
+                const replied = m.replyTo ? messages.find((x) => x.id === m.replyTo) : null
+                const reactions = m.reactions ? Object.entries(m.reactions).filter(([, arr]) => arr.length) : []
+                const canEdit = mine && !deleted && !file && !audio
                 return (
-                  <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                  <div key={m.id} className={`group flex ${mine ? 'justify-end' : 'justify-start'}`}>
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-md sm:max-w-[70%] ${
+                      className={`relative max-w-[85%] rounded-2xl px-3 py-2 shadow-md sm:max-w-[70%] ${
                         mine ? 'rounded-br-md bg-[#0c5f4a]' : 'rounded-bl-md bg-[#0f2847]'
                       } ${m.pending ? 'opacity-70' : ''}`}
                     >
-                      {!mine && <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">{m.bot ? 'Nexus Assistant · auto-reply' : 'Gemini Nexus'}</p>}
-                      {audio ? (
+                      {!mine && !deleted && <p className="mb-0.5 text-[11px] font-semibold text-cyan-300">{m.bot ? 'Nexus Assistant · auto-reply' : 'Gemini Nexus'}</p>}
+                      {replied && (
+                        <div className="mb-1 rounded border-l-2 border-cyan-300/60 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
+                          <span className="block font-semibold text-cyan-200">{replied.sender === 'user' ? 'You' : 'Gemini Nexus'}</span>
+                          <span className="block truncate">{replied.deletedAt ? 'deleted message' : replied.text.replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 80)}</span>
+                        </div>
+                      )}
+                      {deleted ? (
+                        <p className="text-sm italic text-slate-400">🚫 This message was deleted</p>
+                      ) : audio ? (
                         <div className="min-w-56">
                           <p className="mb-1 text-xs text-cyan-100">Voice message</p>
                           <audio controls preload="metadata" src={audio.url} className="max-w-full" />
@@ -572,7 +654,15 @@ export default function ChatPage() {
                           <Linkified text={m.text} />
                         </p>
                       )}
+                      {reactions.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {reactions.map(([e, arr]) => (
+                            <button key={e} onClick={() => react(m, e)} className="rounded-full bg-black/30 px-1.5 py-0.5 text-[11px] hover:bg-black/40">{e} {arr.length}</button>
+                          ))}
+                        </div>
+                      )}
                       <div className={`mt-1 flex items-center gap-1 ${mine ? 'justify-end' : ''}`}>
+                        {m.editedAt && !deleted && <span className="text-[10px] text-slate-500">edited</span>}
                         <span className="text-[10px] text-slate-400">{fmtTime(m.createdAt)}</span>
                         {mine &&
                           (m.pending ? (
@@ -583,6 +673,28 @@ export default function ChatPage() {
                             <Check className="size-4 text-slate-400" aria-label="Sent" />
                           ))}
                       </div>
+
+                      {!deleted && typeof m.id === 'number' && !m.pending && (
+                        <button
+                          onClick={() => setMenuFor(menuFor === m.id ? null : (m.id as number))}
+                          aria-label="Message actions"
+                          className={`absolute top-1 opacity-0 transition group-hover:opacity-100 ${mine ? '-left-7' : '-right-7'} rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white ${menuFor === m.id ? 'opacity-100' : ''}`}
+                        >
+                          <MoreVertical className="size-4" />
+                        </button>
+                      )}
+                      {menuFor === m.id && (
+                        <div className={`absolute top-7 z-30 w-40 rounded-xl border border-white/10 bg-[#0b1a28] p-1 shadow-2xl ${mine ? 'right-0' : 'left-0'}`}>
+                          <div className="flex justify-between px-1 pb-1">
+                            {REACTION_EMOJI.map((e) => (
+                              <button key={e} onClick={() => react(m, e)} className="rounded-full p-1 text-lg hover:bg-white/10" aria-label={`React ${e}`}>{e}</button>
+                            ))}
+                          </div>
+                          <button onClick={() => startReply(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"><CornerUpLeft className="size-3.5" /> Reply</button>
+                          {canEdit && <button onClick={() => startEdit(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-white/10"><Pencil className="size-3.5" /> Edit</button>}
+                          {mine && <button onClick={() => unsend(m)} className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs text-rose-300 hover:bg-rose-500/10"><Trash2 className="size-3.5" /> Delete</button>}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )
@@ -609,6 +721,15 @@ export default function ChatPage() {
             <button onClick={() => setError('')} aria-label="Dismiss">
               <X className="size-4" />
             </button>
+          </div>
+        )}
+        {(replyTo || editing) && (
+          <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-xl border-l-2 border-cyan-300/60 bg-white/5 px-3 py-2 text-xs">
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-cyan-200">{editing ? 'Editing message' : `Replying to ${replyTo?.sender === 'user' ? 'yourself' : 'Gemini Nexus'}`}</p>
+              <p className="truncate text-slate-400">{(editing || replyTo)?.text.replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+            </div>
+            <button onClick={() => { setReplyTo(null); setEditing(null); setInput('') }} aria-label="Cancel" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
           </div>
         )}
         <div className="mx-auto flex max-w-3xl items-end gap-2">
@@ -665,6 +786,7 @@ export default function ChatPage() {
         </button>
       )}
 
+      {menuFor !== null && <button className="fixed inset-0 z-20 cursor-default" aria-label="Close menu" onClick={() => setMenuFor(null)} />}
       <Lightbox url={lightbox?.url ?? null} name={lightbox?.name} onClose={() => setLightbox(null)} />
     </main>
   )
