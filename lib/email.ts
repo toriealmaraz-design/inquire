@@ -1,12 +1,27 @@
-// Transactional email via Resend's HTTP API (no SDK dependency).
-// Inert until RESEND_API_KEY and EMAIL_FROM are set — like push without VAPID keys.
+// Transactional email over SMTP (nodemailer).
+// Inert until SMTP_HOST / SMTP_USER / SMTP_PASS / EMAIL_FROM are set — like push without VAPID keys.
+import nodemailer, { type Transporter } from 'nodemailer'
 
 type Mail = { to: string | string[]; subject: string; html: string; replyTo?: string }
 
 const BRAND = 'Gemini Nexus'
 
 export function emailConfigured(): boolean {
-  return !!(process.env.RESEND_API_KEY && process.env.EMAIL_FROM)
+  return !!(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.EMAIL_FROM)
+}
+
+let transporter: Transporter | null = null
+function getTransporter() {
+  if (transporter) return transporter
+  const port = Number(process.env.SMTP_PORT || 587)
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port,
+    // secure=true for 465 (implicit TLS); false for 587/25 (STARTTLS). Overridable via SMTP_SECURE.
+    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === 'true' : port === 465,
+    auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+  })
+  return transporter
 }
 
 function wrap(title: string, bodyHtml: string): string {
@@ -27,21 +42,13 @@ export async function sendEmail(mail: Mail): Promise<boolean> {
   const to = Array.isArray(mail.to) ? mail.to.filter(Boolean) : [mail.to].filter(Boolean)
   if (to.length === 0) return false
   try {
-    const res = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM,
-        to,
-        subject: mail.subject,
-        html: wrap(mail.subject, mail.html),
-        reply_to: mail.replyTo || process.env.EMAIL_REPLY_TO || undefined,
-      }),
+    await getTransporter().sendMail({
+      from: process.env.EMAIL_FROM,
+      to,
+      subject: mail.subject,
+      html: wrap(mail.subject, mail.html),
+      replyTo: mail.replyTo || process.env.EMAIL_REPLY_TO || undefined,
     })
-    if (!res.ok) {
-      console.error('Email send failed:', res.status, await res.text().catch(() => ''))
-      return false
-    }
     return true
   } catch (error) {
     console.error('Email send error:', error)
