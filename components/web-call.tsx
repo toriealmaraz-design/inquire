@@ -236,52 +236,72 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
         </div>
       )}
 
-      {/* In-call / ringing overlay */}
+      {/* Full-screen call takeover (WhatsApp-style) */}
       {status !== 'idle' && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-          <div className="relative w-full max-w-sm overflow-hidden rounded-3xl border border-white/15 bg-[#0b1a28] text-center text-white shadow-2xl">
-            <div className={videoStage ? 'relative aspect-[3/4] bg-black sm:aspect-video' : 'relative py-8'}>
-              <video ref={remoteMediaRef} autoPlay playsInline className={videoStage ? 'block size-full object-cover' : 'hidden'} />
-              <video ref={localVideoRef} autoPlay playsInline muted className={videoStage ? 'absolute bottom-3 right-3 h-28 w-20 rounded-xl border border-white/20 object-cover' : 'hidden'} />
+        <div className="fixed inset-0 z-[90] flex flex-col overflow-hidden bg-gradient-to-b from-[#0b2a26] via-[#0b1a28] to-[#06121d] text-white">
+          {/* Remote video fills the screen when connected video */}
+          <video ref={remoteMediaRef} autoPlay playsInline className={videoStage ? 'absolute inset-0 size-full object-cover' : 'hidden'} />
+          {videoStage && <div className="absolute inset-0 bg-black/20" />}
+          {/* Local camera preview */}
+          <video ref={localVideoRef} autoPlay playsInline muted className={videoStage ? 'absolute right-4 top-16 z-10 h-40 w-28 rounded-2xl border border-white/20 object-cover shadow-lg' : 'hidden'} />
 
-              {!videoStage && (
-                <div className="px-6">
-                  <div className={`mx-auto flex size-20 items-center justify-center rounded-full ${status === 'connected' ? 'bg-emerald-400/20 text-emerald-300' : 'bg-cyan-400/20 text-cyan-300'} ${status === 'calling' || status === 'incoming' ? 'animate-pulse' : ''}`}>
-                    {isVideo ? <Video className="size-9" /> : <Phone className="size-9" />}
-                  </div>
-                  <p className="mt-4 text-sm font-semibold">
-                    {status === 'calling' ? `Calling ${peerLabel}…` : status === 'incoming' ? `Incoming ${isVideo ? 'video ' : ''}call from ${peerLabel}` : status === 'connecting' ? 'Connecting…' : 'In call'}
-                  </p>
-                  {status === 'connected' && <p className="mt-1 text-xs tabular-nums text-slate-400">{mmss}</p>}
-                  {error && <p className="mt-2 px-4 text-xs text-rose-300">{error}</p>}
+          {/* Top status */}
+          <div className="relative z-10 flex flex-col items-center px-6 pt-[max(2.5rem,env(safe-area-inset-top))]">
+            <p className="text-[11px] font-semibold uppercase tracking-[.25em] text-emerald-300/80">{isVideo ? 'Video call' : 'Voice call'}</p>
+            <p className="mt-3 text-2xl font-semibold">{peerLabel}</p>
+            <p className="mt-1 text-sm text-slate-300">
+              {status === 'calling' ? 'Ringing…' : status === 'incoming' ? 'Incoming call…' : status === 'connecting' ? 'Connecting…' : mmss}
+            </p>
+            {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+          </div>
+
+          {/* Center avatar (hidden during connected video) */}
+          {!videoStage && (
+            <div className="relative z-10 flex flex-1 items-center justify-center">
+              <div className={`flex size-40 items-center justify-center rounded-full bg-white/10 text-5xl font-bold text-white ring-4 ring-white/10 ${status === 'calling' || status === 'incoming' ? 'animate-pulse' : ''}`}>
+                {(peerLabel.trim()[0] || '?').toUpperCase()}
+              </div>
+            </div>
+          )}
+          {videoStage && <div className="flex-1" />}
+
+          {/* Controls */}
+          <div className="relative z-10 px-8 pb-[max(2.5rem,env(safe-area-inset-bottom))] pt-6">
+            {status === 'incoming' ? (
+              <div className="flex items-end justify-around">
+                <div className="flex flex-col items-center gap-2">
+                  <button onClick={decline} className="flex size-16 items-center justify-center rounded-full bg-rose-500 shadow-lg hover:bg-rose-400" aria-label="Decline call"><PhoneOff className="size-7" /></button>
+                  <span className="text-xs text-slate-300">Decline</span>
                 </div>
-              )}
-
-              {videoStage && <span className="absolute left-3 top-3 rounded-full bg-black/50 px-2 py-0.5 text-xs tabular-nums">{mmss}</span>}
-            </div>
-
-            <div className="flex items-center justify-center gap-3 border-t border-white/10 p-5">
-              {status === 'incoming' ? (
-                <>
-                  <button onClick={accept} className="flex size-12 items-center justify-center rounded-full bg-emerald-500 hover:bg-emerald-400" aria-label="Accept call"><Phone className="size-5" /></button>
-                  <button onClick={decline} className="flex size-12 items-center justify-center rounded-full bg-rose-500 hover:bg-rose-400" aria-label="Decline call"><PhoneOff className="size-5" /></button>
-                </>
-              ) : (
-                <>
-                  {status === 'connected' && (
-                    <button onClick={toggleMute} className={`flex size-12 items-center justify-center rounded-full ${muted ? 'bg-amber-500/80' : 'bg-white/10 hover:bg-white/20'}`} aria-label={muted ? 'Unmute' : 'Mute'}>
-                      {muted ? <MicOff className="size-5" /> : <Mic className="size-5" />}
+                <div className="flex flex-col items-center gap-2">
+                  <button onClick={accept} className="flex size-16 items-center justify-center rounded-full bg-emerald-500 shadow-lg hover:bg-emerald-400" aria-label="Accept call"><Phone className="size-7" /></button>
+                  <span className="text-xs text-slate-300">Accept</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-end justify-center gap-6">
+                {status === 'connected' && (
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={toggleMute} className={`flex size-14 items-center justify-center rounded-full ${muted ? 'bg-white text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={muted ? 'Unmute' : 'Mute'}>
+                      {muted ? <MicOff className="size-6" /> : <Mic className="size-6" />}
                     </button>
-                  )}
-                  {status === 'connected' && isVideo && (
-                    <button onClick={toggleCam} className={`flex size-12 items-center justify-center rounded-full ${camOff ? 'bg-amber-500/80' : 'bg-white/10 hover:bg-white/20'}`} aria-label={camOff ? 'Turn camera on' : 'Turn camera off'}>
-                      {camOff ? <VideoOff className="size-5" /> : <Video className="size-5" />}
+                    <span className="text-xs text-slate-300">{muted ? 'Unmute' : 'Mute'}</span>
+                  </div>
+                )}
+                {status === 'connected' && isVideo && (
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={toggleCam} className={`flex size-14 items-center justify-center rounded-full ${camOff ? 'bg-white text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={camOff ? 'Turn camera on' : 'Turn camera off'}>
+                      {camOff ? <VideoOff className="size-6" /> : <Video className="size-6" />}
                     </button>
-                  )}
-                  <button onClick={hangup} className="flex size-12 items-center justify-center rounded-full bg-rose-500 hover:bg-rose-400" aria-label="End call"><PhoneOff className="size-5" /></button>
-                </>
-              )}
-            </div>
+                    <span className="text-xs text-slate-300">Camera</span>
+                  </div>
+                )}
+                <div className="flex flex-col items-center gap-2">
+                  <button onClick={hangup} className="flex size-16 items-center justify-center rounded-full bg-rose-500 shadow-lg hover:bg-rose-400" aria-label="End call"><PhoneOff className="size-7" /></button>
+                  <span className="text-xs text-slate-300">End</span>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
