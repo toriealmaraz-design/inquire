@@ -5,6 +5,7 @@ import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 import { isField, fieldLabel } from '@/lib/fields'
 import { sendPush } from '@/lib/push'
+import { sendEmail } from '@/lib/email'
 
 const ROLE_LABEL: Record<string, string> = {
   super_admin: 'Super Admin',
@@ -55,7 +56,7 @@ export async function PATCH(request: Request) {
 
   const updates: Record<string, unknown> = { updatedAt: new Date() }
 
-  const [before] = await db.select({ status: users.status, role: users.role, field: users.field }).from(users).where(eq(users.id, id)).limit(1)
+  const [before] = await db.select({ status: users.status, role: users.role, field: users.field, email: users.email, name: users.name }).from(users).where(eq(users.id, id)).limit(1)
   if (!before) return NextResponse.json({ error: 'User not found.' }, { status: 404 })
 
   // pending -> active (approve) | rejected (reject); active -> disabled (removed / sacked)
@@ -110,6 +111,14 @@ export async function PATCH(request: Request) {
     }
     for (const a of alerts) {
       await sendPush({ userIds: [id] }, { title: a.title, body: a.body, url: home })
+    }
+    if (before.email && alerts.length) {
+      const origin = new URL(request.url).origin
+      await sendEmail({
+        to: before.email,
+        subject: alerts[0].title.replace(/^[^\w]+/, ''),
+        html: `<p>Hi ${before.name || 'there'},</p>${alerts.map((a) => `<p><strong>${a.title}</strong><br/>${a.body}</p>`).join('')}<p style="margin-top:16px"><a href="${origin}${home}" style="color:#67e8f9">Open your dashboard →</a></p>`,
+      })
     }
   } catch (error) {
     console.error('Account notification failed:', error)

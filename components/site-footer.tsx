@@ -4,6 +4,7 @@ import { BrandLogo } from '@/components/branding'
 const nav = [
   { href: '/', label: 'Intake portal' },
   { href: '/workflow', label: 'How it works' },
+  { href: '/track', label: 'Track order' },
   { href: '/about', label: 'About' },
   { href: '/faq', label: 'FAQ' },
   { href: '/feedback', label: 'Feedback' },
