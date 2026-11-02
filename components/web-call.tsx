@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -71,6 +72,8 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
   const [camOff, setCamOff] = useState(false)
   const [seconds, setSeconds] = useState(0)
   const [error, setError] = useState('')
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
 
   const supabaseRef = useRef(createClient())
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
@@ -236,8 +239,8 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
         </div>
       )}
 
-      {/* Full-screen call takeover (WhatsApp-style) */}
-      {status !== 'idle' && (
+      {/* Full-screen call takeover (WhatsApp-style) — portaled to body so no blurred/transformed ancestor traps it */}
+      {status !== 'idle' && mounted && createPortal(
         <div className="fixed inset-0 z-[90] flex flex-col overflow-hidden bg-gradient-to-b from-[#0b2a26] via-[#0b1a28] to-[#06121d] text-white">
           {/* Remote video fills the screen when connected video */}
           <video ref={remoteMediaRef} autoPlay playsInline className={videoStage ? 'absolute inset-0 size-full object-cover' : 'hidden'} />
@@ -303,7 +306,8 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person' }
               </div>
             )}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
