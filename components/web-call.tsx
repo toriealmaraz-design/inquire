@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from 'lucide-react'
+import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff, MonitorUp, MonitorOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type Role = 'client' | 'agent'
@@ -74,6 +74,8 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
   const [error, setError] = useState('')
   const [mounted, setMounted] = useState(false)
   const [peerPresent, setPeerPresent] = useState(false)
+  const [screenSharing, setScreenSharing] = useState(false)
+  const [remoteVideoLive, setRemoteVideoLive] = useState(false)
   useEffect(() => setMounted(true), [])
 
   const supabaseRef = useRef(createClient())
@@ -87,6 +89,9 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const ringerRef = useRef<ReturnType<typeof createRinger> | null>(null)
   if (!ringerRef.current) ringerRef.current = createRinger()
+  const videoSenderRef = useRef<RTCRtpSender | null>(null)
+  const cameraTrackRef = useRef<MediaStreamTrack | null>(null)
+  const screenStreamRef = useRef<MediaStream | null>(null)
 
   const send = useCallback((signal: Signal) => {
     channelRef.current?.send({ type: 'broadcast', event: 'signal', payload: signal })
@@ -101,11 +106,17 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
     pcRef.current = null
     localStreamRef.current?.getTracks().forEach((t) => t.stop())
     localStreamRef.current = null
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop())
+    screenStreamRef.current = null
+    videoSenderRef.current = null
+    cameraTrackRef.current = null
     pendingOfferRef.current = null
     pendingIceRef.current = []
     setStatus('idle')
     setMuted(false)
     setCamOff(false)
+    setScreenSharing(false)
+    setRemoteVideoLive(false)
     setSeconds(0)
   }, [])
 
@@ -118,8 +129,26 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
     localStreamRef.current = stream
     const pc = new RTCPeerConnection(RTC_CONFIG)
     stream.getTracks().forEach((t) => pc.addTrack(t, stream))
+    // Guarantee a reusable video send slot so screen-sharing works even on a voice call (no renegotiation).
+    const camTrack = stream.getVideoTracks()[0] || null
+    cameraTrackRef.current = camTrack
+    if (camTrack) {
+      videoSenderRef.current = pc.getSenders().find((s) => s.track === camTrack) || null
+    } else {
+      videoSenderRef.current = pc.addTransceiver('video', { direction: 'sendrecv' }).sender
+    }
     pc.onicecandidate = (e) => { if (e.candidate) send({ kind: 'ice', candidate: e.candidate.toJSON(), from: role }) }
-    pc.ontrack = (e) => { if (remoteMediaRef.current) remoteMediaRef.current.srcObject = e.streams[0] }
+    pc.ontrack = (e) => {
+      if (remoteMediaRef.current) remoteMediaRef.current.srcObject = e.streams[0]
+      if (e.track.kind === 'video') {
+        const t = e.track
+        const sync = () => setRemoteVideoLive(t.readyState === 'live' && !t.muted)
+        t.onunmute = sync
+        t.onmute = sync
+        t.onended = () => setRemoteVideoLive(false)
+        sync()
+      }
+    }
     pc.onconnectionstatechange = () => {
       const st = pc.connectionState
       if (st === 'connected') {
@@ -234,13 +263,42 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
     if (track) { track.enabled = !track.enabled; setCamOff(!track.enabled) }
   }
 
+  const stopScreen = useCallback(async () => {
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop())
+    screenStreamRef.current = null
+    // Restore the camera track (video call) or send nothing (voice call).
+    await videoSenderRef.current?.replaceTrack(cameraTrackRef.current || null)
+    if (localVideoRef.current && localStreamRef.current) localVideoRef.current.srcObject = localStreamRef.current
+    setScreenSharing(false)
+  }, [])
+
+  const toggleScreen = useCallback(async () => {
+    if (screenSharing) return stopScreen()
+    if (!videoSenderRef.current) return setError('Screen sharing is not available on this call.')
+    const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream> }
+    if (!md.getDisplayMedia) return setError('Screen sharing is not supported on this device.')
+    try {
+      const display = await md.getDisplayMedia({ video: true, audio: false })
+      const screenTrack = display.getVideoTracks()[0]
+      if (!screenTrack) return
+      screenStreamRef.current = display
+      await videoSenderRef.current.replaceTrack(screenTrack)
+      if (localVideoRef.current) localVideoRef.current.srcObject = display
+      screenTrack.onended = () => { stopScreen() }
+      setScreenSharing(true)
+    } catch (e) {
+      // User cancelled the picker, or permission denied — not a hard error.
+      if (e instanceof Error && e.name !== 'NotAllowedError') setError(e.message)
+    }
+  }, [screenSharing, stopScreen])
+
   const mmss = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
   const disabled = !conversationId
   const peerLabelShort = role === 'client' ? 'an agent' : peerLabel
   const callReady = !disabled && peerActive && peerPresent
   const callBlockedReason = disabled ? 'Start a conversation first' : !callReady ? `Available when ${peerLabelShort} is active in this chat` : ''
   const isVideo = callType === 'video'
-  const videoStage = isVideo && status === 'connected'
+  const videoStage = status === 'connected' && (isVideo || screenSharing || remoteVideoLive)
 
   return (
     <>
@@ -314,6 +372,14 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
                       {camOff ? <VideoOff className="size-6" /> : <Video className="size-6" />}
                     </button>
                     <span className="text-xs text-slate-300">Camera</span>
+                  </div>
+                )}
+                {status === 'connected' && (
+                  <div className="flex flex-col items-center gap-2">
+                    <button onClick={toggleScreen} className={`flex size-14 items-center justify-center rounded-full ${screenSharing ? 'bg-cyan-300 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={screenSharing ? 'Stop sharing screen' : 'Share screen'}>
+                      {screenSharing ? <MonitorOff className="size-6" /> : <MonitorUp className="size-6" />}
+                    </button>
+                    <span className="text-xs text-slate-300">{screenSharing ? 'Stop share' : 'Share'}</span>
                   </div>
                 )}
                 <div className="flex flex-col items-center gap-2">
