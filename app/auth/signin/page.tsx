@@ -51,7 +51,7 @@ function AuthContent() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+          redirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin + '/auth/callback'}?redirectTo=${encodeURIComponent(redirectTo)}`,
         },
       })
 
@@ -81,11 +81,16 @@ function AuthContent() {
       password,
     })
 
-    if (error) {
-      setError(error.message)
-      setLoading(false)
-    } else {
-      // Full reload so the server sees the new session cookie
+  if (error) {
+    const message = /email not confirmed/i.test(error.message)
+      ? 'Please confirm your email before signing in.'
+      : /invalid login credentials/i.test(error.message)
+        ? 'Invalid email or password.'
+        : 'Sign-in could not be completed. Please try again.'
+    setError(message)
+    setLoading(false)
+  } else {
+    // Full reload so the server sees the new session cookie
       router.refresh()
       window.location.assign(redirectTo)
     }
@@ -113,7 +118,7 @@ function AuthContent() {
         data: {
           full_name: fullName,
         },
-        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin + '/auth/callback'}?redirectTo=${encodeURIComponent(redirectTo)}`,
       },
     })
 
@@ -139,7 +144,7 @@ function AuthContent() {
       email,
       options: {
         shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/auth/callback?redirectTo=${encodeURIComponent(redirectTo)}`,
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL || window.location.origin + '/auth/callback'}?redirectTo=${encodeURIComponent(redirectTo)}`,
       },
     })
     setLoading(false)
