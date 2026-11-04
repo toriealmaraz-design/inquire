@@ -229,17 +229,33 @@ alter publication supabase_realtime add table public.messages;
 alter publication supabase_realtime add table public.uploads;
 
 -- ---------------------------------------------------------------------------
--- 4. Storage: public 'site-assets' bucket for logo/favicon uploads + policies
+-- 4. Storage buckets + policies
+--    'uploads'     : brief & chat file attachments (clients upload via anon key).
+--    'site-assets' : logo/favicon (super-admin AssetManager).
 -- ---------------------------------------------------------------------------
-insert into storage.buckets (id, name, public)
-values ('site-assets', 'site-assets', true)
-on conflict (id) do update set public = true;
+insert into storage.buckets (id, name, public) values ('uploads', 'uploads', true)
+  on conflict (id) do update set public = true;
+insert into storage.buckets (id, name, public) values ('site-assets', 'site-assets', true)
+  on conflict (id) do update set public = true;
 
-drop policy if exists "site-assets public read"   on storage.objects;
-drop policy if exists "site-assets auth insert"    on storage.objects;
-drop policy if exists "site-assets auth update"    on storage.objects;
-drop policy if exists "site-assets auth delete"    on storage.objects;
+-- uploads: public read; anon + authenticated may upload / change / remove their files
+drop policy if exists "uploads public read"   on storage.objects;
+drop policy if exists "uploads write insert"   on storage.objects;
+drop policy if exists "uploads write update"   on storage.objects;
+drop policy if exists "uploads write delete"   on storage.objects;
+create policy "uploads public read" on storage.objects
+  for select using (bucket_id = 'uploads');
+create policy "uploads write insert" on storage.objects
+  for insert to anon, authenticated with check (bucket_id = 'uploads');
+create policy "uploads write update" on storage.objects
+  for update to anon, authenticated using (bucket_id = 'uploads');
+create policy "uploads write delete" on storage.objects
+  for delete to anon, authenticated using (bucket_id = 'uploads');
 
+drop policy if exists "site-assets public read" on storage.objects;
+drop policy if exists "site-assets auth insert"  on storage.objects;
+drop policy if exists "site-assets auth update"  on storage.objects;
+drop policy if exists "site-assets auth delete"  on storage.objects;
 create policy "site-assets public read" on storage.objects
   for select using (bucket_id = 'site-assets');
 create policy "site-assets auth insert" on storage.objects
