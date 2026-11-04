@@ -78,7 +78,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
   const [remoteVideoLive, setRemoteVideoLive] = useState(false)
   useEffect(() => setMounted(true), [])
 
-  const supabaseRef = useRef(createClient())
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null)
   const pcRef = useRef<RTCPeerConnection | null>(null)
   const localStreamRef = useRef<MediaStream | null>(null)
@@ -177,6 +177,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
   // calls are only allowed, and only ring, when both sides are present.
   useEffect(() => {
     if (!conversationId) { setPeerPresent(false); return }
+    if (!supabaseRef.current) supabaseRef.current = createClient()
     const ch = supabaseRef.current.channel(`call-${conversationId}`, {
       config: { broadcast: { self: false }, presence: { key: role } },
     })
@@ -212,7 +213,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
       .on('presence', { event: 'join' }, syncPresence)
       .on('presence', { event: 'leave' }, syncPresence)
       .subscribe((s) => { if (s === 'SUBSCRIBED') ch.track({ role, at: Date.now() }) })
-    return () => { supabaseRef.current.removeChannel(ch); channelRef.current = null; setPeerPresent(false); cleanup() }
+      return () => { supabaseRef.current?.removeChannel(ch); channelRef.current = null; setPeerPresent(false); cleanup() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId, role])
 
