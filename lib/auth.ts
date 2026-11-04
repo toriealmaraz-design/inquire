@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, or } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { users } from '@/lib/db/schema'
 
@@ -141,9 +141,14 @@ async function loadAppUser(user: AuthUser): Promise<AppUser> {
   if (!email) throw new Error('Auth user has no email')
   const meta = user.user_metadata || {}
 
-  const [dbUser] = await db.select().from(users).where(eq(users.email, email)).limit(1)
+  const [dbUser] = await db
+    .select()
+    .from(users)
+    .where(or(eq(users.authId, user.id), eq(users.email, email)))
+    .limit(1)
   if (dbUser) {
     const updates: Record<string, any> = {}
+    if (dbUser.authId !== user.id) updates.authId = user.id
     if (meta.avatar_url && meta.avatar_url !== dbUser.avatar) updates.avatar = meta.avatar_url
     if (meta.full_name && meta.full_name !== dbUser.name) updates.name = meta.full_name
     if (Object.keys(updates).length) {
