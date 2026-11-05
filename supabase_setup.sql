@@ -276,6 +276,24 @@ grant all on all sequences in schema public to anon, authenticated;
 alter default privileges in schema public grant all on tables to anon, authenticated;
 alter default privileges in schema public grant all on sequences to anon, authenticated;
 
+-- Disable RLS on the app tables. The browser uses the anon key to read/write chat
+-- messages, conversations and uploads directly; server routes use DATABASE_URL
+-- (postgres) and bypass RLS. If a prior tool enabled RLS, this turns it back off.
+do $$
+declare t text;
+begin
+  foreach t in array array[
+    'users','settings','conversations','messages','uploads','submissions',
+    'announcements','push_subscriptions','staff_accounts','chatbot_replies',
+    'chatbot_misses','notifications','complaints','testimonials','ticket_counters'
+  ] loop
+    execute format('alter table if exists public.%I disable row level security', t);
+  end loop;
+end $$;
+
+-- Make sure the single settings row exists (branding, VAPID keys, commission %, etc.)
+insert into public.settings (id) values (1) on conflict (id) do nothing;
+
 -- ============================================================================
 -- Done. The first user to sign in with the Google account matching
 -- SUPER_ADMIN_EMAIL is promoted to super_admin automatically by the app.
