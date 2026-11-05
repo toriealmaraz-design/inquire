@@ -223,10 +223,16 @@ begin
   if not exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
     create publication supabase_realtime;
   end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='conversations') then
+    alter publication supabase_realtime add table public.conversations;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='messages') then
+    alter publication supabase_realtime add table public.messages;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname='supabase_realtime' and schemaname='public' and tablename='uploads') then
+    alter publication supabase_realtime add table public.uploads;
+  end if;
 end $$;
-alter publication supabase_realtime add table public.conversations;
-alter publication supabase_realtime add table public.messages;
-alter publication supabase_realtime add table public.uploads;
 
 -- ---------------------------------------------------------------------------
 -- 4. Storage buckets + policies
