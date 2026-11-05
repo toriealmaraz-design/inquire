@@ -83,10 +83,9 @@ export async function POST(request: Request) {
       referredBy = agent?.id ?? null
     }
 
-    // Create a readable ticket without depending on a database function that may be missing.
-    const prefix = category.slice(0, 2).toUpperCase()
-    const datePart = new Date().toISOString().slice(2, 10).replace(/-/g, '')
-    const ticketId = `${prefix}-${datePart}-${String(Date.now()).slice(-6)}`
+    // Track-based ticket number from the database, e.g. AC-2610-007 (matches TICKET_RE / tracker)
+    const { rows: [num] } = await db.execute(sql`select public.next_ticket_id(${category}) as id`)
+    const ticketId = String((num as { id: string }).id)
     const [created] = await db
       .insert(submissions)
       .values({
