@@ -109,6 +109,15 @@ export function ChatbotWidget() {
     if (THANKS.test(q) && q.length < 25) return { from: 'bot', text: "You're welcome! Anything else I can help with?" }
 
     fetch('/api/chatbot/miss', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: q }) }).catch(() => {})
+    try {
+      const res = await fetch('/api/chatbot/answer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: q }),
+      })
+      const data = res.ok ? await res.json() : null
+      if (typeof data?.answer === 'string' && data.answer.trim()) return { from: 'bot', text: data.answer.trim() }
+    } catch {}
     return { from: 'bot', text: "I'm not sure about that one. Our team can answer it in Live Chat. I'll pass your question along.", handoff: q }
   }
 
