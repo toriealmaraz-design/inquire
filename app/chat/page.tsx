@@ -231,11 +231,11 @@ export default function ChatPage() {
   }, [supabase])
 
   // Greeting + away message from the admin's chatbot settings
-  const [botCfg, setBotCfg] = useState<{ greeting: string; away: string }>({ greeting: '', away: '' })
+  const [botCfg, setBotCfg] = useState<{ greeting: string; away: string; autoReplyEnabled: boolean }>({ greeting: '', away: '', autoReplyEnabled: false })
   useEffect(() => {
     fetch('/api/chatbot')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setBotCfg({ greeting: d.greeting || '', away: d.awayMessage || '' }))
+      .then((d) => d && setBotCfg({ greeting: d.greeting || '', away: d.awayMessage || '', autoReplyEnabled: d.autoReplyEnabled !== false }))
       .catch(() => {})
     // Tell admins a possible client is here (once per browser session)
     if (!sessionStorage.getItem('nexus_visit_alerted')) {
@@ -245,8 +245,8 @@ export default function ChatPage() {
     }
   }, [])
 
-  // While the client's latest message has no admin reply, keep nudging the admins
-  // (the server sends at most one reminder every 3 minutes, for up to an hour)
+  // While the client's latest message has no human reply, keep nudging all admins.
+  // The server throttles these reminders to one every 3 minutes.
   const lastSender = messages.filter((m) => !m.bot).at(-1)?.sender
   useEffect(() => {
     if (!convoId || lastSender !== 'user') return
@@ -381,14 +381,42 @@ export default function ChatPage() {
     setReplyTo(null)
     const tmpId = `tmp-${Date.now()}`
     setMessages((prev) => [...prev, { id: tmpId, text, sender: 'user', createdAt: new Date().toISOString(), pending: true, replyTo: replyId }])
-    const ok = await postMessage(text, tmpId, replyId)
-    if (ok && online === false && botCfg.away && supabase) {
-      const recentAway = messages.some((m) => m.bot && m.text === botCfg.away && Date.now() - Date.parse(m.createdAt) < 30 * 60_000)
-      if (!recentAway) {
-        await supabase.from('messages').insert({ conversation_id: ok, sender_type: 'bot', content: botCfg.away, read: true })
+    const conversationId = await postMessage(text, tmpId, replyId)
+    if (conversationId && online === false && botCfg.autoReplyEnabled && supabase) {
+      try {
+        const { data: latestClientMessage } = await supabase
+          .from('messages')
+          .select('id, sender_type')
+          .eq('conversation_id', conversationId)
+          .order('id', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (latestClientMessage?.sender_type === 'client') {
+          const response = await fetch('/api/chatbot/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question: text }),
+          })
+          const data = response.ok ? await response.json() : null
+          const answer = typeof data?.answer === 'string' && data.answer.trim()
+            ? data.answer.trim()
+            : botCfg.away || 'Nexa here. I have alerted our admins and will help with what I can. If I cannot answer, someone will follow up.'
+          const { data: latestMessage } = await supabase
+            .from('messages')
+            .select('id, sender_type')
+            .eq('conversation_id', conversationId)
+            .order('id', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+          if (online === false && latestMessage && latestMessage.id === latestClientMessage.id && latestMessage.sender_type === 'client') {
+            await supabase.from('messages').insert({ conversation_id: conversationId, sender_type: 'bot', content: answer, read: true })
+          }
+        }
+      } catch (error) {
+        console.error('Nexa away reply failed:', error)
       }
     }
-    if (!ok) {
+    if (!conversationId) {
       setMessages((prev) => prev.filter((m) => m.id !== tmpId))
       setInput(text)
       setError("Your message didn't send. Check your connection and try again.")

@@ -89,12 +89,12 @@ export function ChatbotSettings() {
         <div>
           <h2 className="flex items-center gap-2 font-bold"><Bot className="size-4 text-cyan-300" /> Chatbot &amp; automatic replies</h2>
           <p className="mt-1 text-xs text-slate-500">
-            These answers power the homepage assistant and reply automatically in Live Chat when a client's message contains a keyword.
+            Nexa uses these approved answers on the homepage and in Live Chat. When admins are away, it replies while alerting all active admins every 3 minutes until a human responds.
           </p>
         </div>
         <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-300">
           <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="size-4 accent-cyan-500" />
-          Auto-reply in Live Chat
+          Nexa replies when admins are away
         </label>
       </div>
 
@@ -104,7 +104,7 @@ export function ChatbotSettings() {
         <>
           <label className="mt-5 block text-xs font-medium text-slate-400">Greeting (sent automatically on a client's first message)</label>
           <textarea value={greeting} onChange={(e) => setGreeting(e.target.value)} rows={2} maxLength={600} className={`${field} mt-2 py-2`} />
-          <label className="mt-4 block text-xs font-medium text-slate-400">Away message (sent automatically when no admin is online)</label>
+          <label className="mt-4 block text-xs font-medium text-slate-400">Fallback message (used if Nexa cannot answer)</label>
           <textarea value={away} onChange={(e) => setAway(e.target.value)} rows={2} maxLength={600} className={`${field} mt-2 py-2`} />
 
           {misses.length > 0 && (

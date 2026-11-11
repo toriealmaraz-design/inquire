@@ -11,33 +11,37 @@ export const runtime = 'nodejs'
  * Public (called by /chat). Keeps admins alerted about a client until someone replies:
  *  - first alert as soon as the client writes
  *  - then a reminder every 3 minutes while the client is still waiting (no admin reply after
- *    their latest message), escalating the wording. Stops once an admin answers or after 1 hour.
+ *    their latest message), escalating the wording. Continues until an admin answers.
  */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => null)
   const id = Number(body?.conversationId)
   if (!Number.isInteger(id) || id < 1) return NextResponse.json({ ok: false }, { status: 400 })
 
+  const tag = `chat-${id}`
   const { rows } = await db.execute(sql`
     with w as (
       select
         (select max(created_at) from messages where conversation_id = ${id} and sender_type = 'client') as last_client,
         (select max(created_at) from messages where conversation_id = ${id} and sender_type = 'agent') as last_agent
     )
-    update conversations c set notified_at = now()
-    from w
-    where c.id = ${id}
-      and w.last_client is not null
-      and w.last_client > now() - interval '1 hour'
-      and (w.last_agent is null or w.last_agent < w.last_client)
-      and (c.notified_at is null or c.notified_at < now() - interval '3 minutes')
-    returning c.client_name,
+    select c.client_name,
       extract(epoch from now() - (
         select min(created_at) from messages m
         where m.conversation_id = ${id} and m.sender_type = 'client'
           and m.created_at > coalesce(w.last_agent, '-infinity'::timestamptz)
       ))::int / 60 as waiting_min,
-      (select content from messages m where m.conversation_id = ${id} and m.sender_type = 'client' order by id desc limit 1) as last`)
+      (select content from messages m where m.conversation_id = ${id} and m.sender_type = 'client' order by id desc limit 1) as last
+    from conversations c cross join w
+    where c.id = ${id}
+      and c.status = 'active'
+      and w.last_client is not null
+      and (w.last_agent is null or w.last_agent < w.last_client)
+      and not exists (
+        select 1 from notifications n
+        where n.tag = ${tag} and n.created_at >= now() - interval '3 minutes'
+      )
+    limit 1`)
   const hit = rows[0] as { client_name: string; waiting_min: number; last: string } | undefined
   if (!hit) return NextResponse.json({ ok: true, sent: 0 })
 
