@@ -277,7 +277,7 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
     if (screenSharing) return stopScreen()
     if (!videoSenderRef.current) return setError('Screen sharing is not available on this call.')
     const md = navigator.mediaDevices as MediaDevices & { getDisplayMedia?: (c?: DisplayMediaStreamOptions) => Promise<MediaStream> }
-    if (!md.getDisplayMedia) return setError('Screen sharing is not supported on this device.')
+    if (!window.isSecureContext || !md?.getDisplayMedia) return setError('Screen sharing requires a supported browser on a secure connection. Try desktop Chrome, Edge, or Firefox.')
     try {
       const display = await md.getDisplayMedia({ video: true, audio: false })
       const screenTrack = display.getVideoTracks()[0]
@@ -375,12 +375,12 @@ export function WebCall({ conversationId, role, peerLabel = 'the other person', 
                     <span className="text-xs text-slate-300">Camera</span>
                   </div>
                 )}
-                {status === 'connected' && (
+                {status === 'connected' && isVideo && (
                   <div className="flex flex-col items-center gap-2">
-                    <button onClick={toggleScreen} className={`flex size-14 items-center justify-center rounded-full ${screenSharing ? 'bg-cyan-300 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={screenSharing ? 'Stop sharing screen' : 'Share screen'}>
+                    <button onClick={toggleScreen} className={`flex size-14 items-center justify-center rounded-full ${screenSharing ? 'bg-cyan-300 text-slate-900' : 'bg-white/10 hover:bg-white/20'}`} aria-label={screenSharing ? 'Stop sharing screen' : 'Share screen'} title={screenSharing ? 'Stop sharing screen' : 'Share your screen'}>
                       {screenSharing ? <MonitorOff className="size-6" /> : <MonitorUp className="size-6" />}
                     </button>
-                    <span className="text-xs text-slate-300">{screenSharing ? 'Stop share' : 'Share'}</span>
+                    <span className="text-xs text-slate-300">{screenSharing ? 'Stop share' : 'Share screen'}</span>
                   </div>
                 )}
                 <div className="flex flex-col items-center gap-2">
