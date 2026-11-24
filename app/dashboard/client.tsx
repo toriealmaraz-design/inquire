@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -381,7 +382,7 @@ export function DashboardClient({ user }: { user: User }) {
   const activeCount = users.filter(u => u.status === 'active').length
 
   return (
-    <main className="min-h-screen bg-[#06121d] text-slate-100">
+    <main className="portal-page min-h-screen bg-transparent text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
         <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
@@ -502,7 +503,7 @@ export function DashboardClient({ user }: { user: User }) {
               <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">
                 {isSuperAdmin ? 'Super Admin' : isSubAdmin ? 'Admin' : 'Dashboard'}
               </p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">{tab}</h1>
+              <AnimatedHeading as="h1" className="mt-2 text-3xl font-bold tracking-tight">{tab}</AnimatedHeading>
             </div>
             <div className="flex items-center gap-2">
               <a href="/help" className="flex h-11 items-center gap-2 rounded-2xl border border-white/15 bg-white/[0.075] px-4 text-xs font-semibold text-slate-300 backdrop-blur-2xl hover:text-white">
@@ -540,7 +541,7 @@ export function DashboardClient({ user }: { user: User }) {
               <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
                 <div className="flex flex-wrap items-end justify-between gap-4">
                   <div>
-                    <h2 className="font-bold">Clients &amp; assignments</h2>
+                    <AnimatedHeading as="h2" className="font-bold">Clients &amp; assignments</AnimatedHeading>
                     <p className="mt-1 text-xs text-slate-500">
                       One folder per client with all their briefs and files. Files are deleted automatically after 7 days, so download them before then.
                     </p>
@@ -793,7 +794,7 @@ export function DashboardClient({ user }: { user: User }) {
             <div className={`${glass} mt-8 rounded-3xl p-5 sm:p-6`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="font-bold">Live Chats</h2>
+                  <AnimatedHeading as="h2" className="font-bold">Live Chats</AnimatedHeading>
                   <p className="mt-1 text-xs text-slate-500">{conversations.length} conversation{conversations.length === 1 ? '' : 's'} · {unread} unread</p>
                 </div>
                 <a
@@ -878,7 +879,7 @@ export function DashboardClient({ user }: { user: User }) {
               <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="font-bold">Commission</h2>
+                    <AnimatedHeading as="h2" className="font-bold">Commission</AnimatedHeading>
                     <p className="mt-1 text-xs text-slate-500">Applies to every job price set when assigning.</p>
                   </div>
                   {settingsError && <span role="alert" className="text-xs text-rose-300">{settingsError}</span>}
@@ -907,7 +908,7 @@ export function DashboardClient({ user }: { user: User }) {
                 </div>
 
                 <div className="mt-8 border-t border-white/10 pt-6">
-                  <h3 className="font-semibold">Your contact handles</h3>
+                  <AnimatedHeading as="h3" className="font-semibold">Your contact handles</AnimatedHeading>
                   <p className="mt-1 text-xs text-slate-500">Shown to admins (never to clients or agents) so they can reach you directly.</p>
                   <div className="mt-4 grid gap-3 sm:grid-cols-2">
                     {([
@@ -951,7 +952,7 @@ export function DashboardClient({ user }: { user: User }) {
               {/* Info Card */}
               <div className={`${glass} rounded-3xl p-5 h-fit xl:row-span-2`}>
                 <ShieldCheck className="size-6 text-emerald-400" />
-                <h3 className="mt-4 font-bold">Security</h3>
+                <AnimatedHeading as="h3" className="mt-4 font-bold">Security</AnimatedHeading>
                 <p className="mt-2 text-xs leading-5 text-slate-500">
                   Only the super admin can change commission and chatbot settings. Clients reach you through Live Chat and the homepage assistant.
                 </p>

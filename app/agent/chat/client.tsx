@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -386,7 +387,7 @@ export function AgentChatClient({ user }: { user: User }) {
   const activeConvoData = conversations.find((c) => c.id === activeConvo)
 
   return (
-    <main className="flex h-[100dvh] overflow-hidden bg-[#06121d]">
+    <main className="portal-page flex h-[100dvh] overflow-hidden bg-transparent">
       {/* Sidebar - conversation list */}
       <aside className={`${activeConvo ? 'hidden lg:flex' : 'flex'} w-full shrink-0 flex-col border-r border-white/10 bg-[#0a1929] lg:w-80`}>
         <div className="p-4 border-b border-white/10">
@@ -636,7 +637,7 @@ export function AgentChatClient({ user }: { user: User }) {
         <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/70 p-4" onClick={() => setForwarding(null)}>
           <div className="w-full max-w-sm rounded-2xl border border-white/15 bg-[#0b1a28] p-4 text-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-sm font-bold">Forward to…</h3>
+              <AnimatedHeading as="h3" className="text-sm font-bold">Forward to…</AnimatedHeading>
               <button onClick={() => setForwarding(null)} aria-label="Close" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
             </div>
             <p className="mb-2 truncate rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400">{maskFiles(forwarding.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>

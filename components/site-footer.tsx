@@ -18,11 +18,11 @@ const legal = [
 /** Global site footer with links to info & legal pages. */
 export function SiteFooter() {
   return (
-    <footer className="relative z-10 border-t border-white/10 bg-[#06121d]/80">
+    <footer className="relative z-10 border-t border-cyan-300/10 bg-[#060B14]/75 backdrop-blur-xl">
       <div className="mx-auto grid max-w-7xl gap-8 px-5 py-12 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div className="sm:col-span-2 lg:col-span-1">
           <div className="flex items-center gap-3">
-            <BrandLogo width={36} height={36} className="size-9 rounded-xl object-cover" />
+            <BrandLogo width={36} height={36} className="size-9 rounded-full border border-cyan-300/40 object-cover shadow-[0_0_20px_rgba(0,240,255,0.15)]" />
             <strong className="text-sm tracking-tight text-white">Gemini Nexus</strong>
           </div>
           <p className="mt-4 max-w-xs text-xs leading-5 text-slate-500">

@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useEffect, useState } from 'react'
 import { Trophy, ArrowUpCircle } from 'lucide-react'
 import { fieldLabel } from '@/lib/fields'
@@ -70,7 +71,7 @@ export function Leaderboard({ compact = false }: { compact?: boolean }) {
     <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 font-bold"><Trophy className="size-4 text-amber-300" /> Agent leaderboard</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Trophy className="size-4 text-amber-300" /> Agent leaderboard</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">Ranked by paid jobs, then commission, then referrals. The top 3 can be promoted to admin.</p>
         </div>
         <div className="flex rounded-xl bg-white/5 p-1 text-xs">

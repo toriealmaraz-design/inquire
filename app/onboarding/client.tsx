@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, BookOpen, Check, Code2, FileText, Loader2, Palette, ShieldCheck, Sparkles } from 'lucide-react'
 
@@ -141,7 +142,7 @@ export function OnboardingClient({ name, initial, editing }: { name: string; ini
   const pct = Math.round(((step + 1) / STEPS.length) * 100)
 
   return (
-    <main className="min-h-screen bg-[#06121d] px-5 py-10 text-white">
+    <main className="portal-page min-h-screen bg-transparent px-5 py-10 text-[#F8FAFC]">
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
         <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
@@ -149,7 +150,7 @@ export function OnboardingClient({ name, initial, editing }: { name: string; ini
 
       <div className="relative mx-auto max-w-2xl">
         <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-cyan-300"><Sparkles className="size-3.5" /> {editing ? 'Update your profile' : "You're approved"}</p>
-        <h1 className="mt-3 text-3xl font-bold tracking-tight">{editing ? 'Your skills profile' : `Welcome to the team, ${name.split(' ')[0]}!`}</h1>
+        <AnimatedHeading as="h1" className="mt-3 text-3xl font-bold tracking-tight">{editing ? 'Your skills profile' : `Welcome to the team, ${name.split(' ')[0]}!`}</AnimatedHeading>
         <p className="mt-2 text-sm text-slate-400">
           Tell us what you&apos;re great at so admins can send you the right assignments. It takes about 3 minutes.
         </p>

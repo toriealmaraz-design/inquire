@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useState, useEffect } from 'react'
 import { ArrowLeft, Search, PackageCheck, Loader2, AlertCircle, CheckCircle2, Circle } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
@@ -58,12 +59,12 @@ export default function TrackPage() {
   const field = 'h-12 w-full rounded-2xl border border-white/10 bg-black/15 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60'
 
   return (
-    <main className="flex min-h-screen flex-col overflow-x-hidden bg-[#06121d] text-slate-100">
+    <main className="portal-page flex min-h-screen flex-col overflow-x-hidden bg-transparent text-[#F8FAFC]">
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
         <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
       </div>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-cyan-300/10 bg-[#060B14]/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
           <a href="/" className="flex items-center gap-3">
             <BrandLogo width={40} height={40} className="size-10 rounded-xl object-cover" />
@@ -74,7 +75,7 @@ export default function TrackPage() {
       </header>
 
       <section className="relative z-10 mx-auto w-full max-w-2xl flex-1 px-5 py-14 lg:px-8">
-        <h1 className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">Track your order</h1>
+        <AnimatedHeading as="h1" className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">Track your order</AnimatedHeading>
         <p className="mt-4 max-w-xl text-base leading-7 text-slate-400">Enter the ticket number from your brief confirmation (for example <span className="font-mono text-cyan-200">AC-2610-001</span>) to see its current status.</p>
 
         <form onSubmit={lookup} className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -97,7 +98,7 @@ export default function TrackPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">{result.ticketId}</p>
-                <h2 className="mt-1 truncate text-lg font-semibold text-white">{result.title}</h2>
+                <AnimatedHeading as="h2" className="mt-1 truncate text-lg font-semibold text-white">{result.title}</AnimatedHeading>
                 <p className="text-sm text-slate-400">{result.serviceType}</p>
               </div>
               <span className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">{result.status}</span>

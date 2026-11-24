@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -114,7 +115,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
   }, [supabase, load])
 
   return (
-    <main className="min-h-screen bg-[#06121d] text-slate-100">
+    <main className="portal-page min-h-screen bg-transparent text-slate-100">
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
         <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
@@ -150,7 +151,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
         <RoleWatcher role={user.role} field={user.field} />
         <div className="mt-6"><PushPrompt showTest /></div>
 
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
+        <AnimatedHeading as="h1" className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</AnimatedHeading>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <a href="/onboarding" className="text-cyan-300 hover:underline">Edit my skills profile →</a>
           <a href="/complaints" className="text-amber-300 hover:underline">Lodge a complaint →</a>
@@ -177,7 +178,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
 
         {/* Referral link + commission */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-          <h2 className="flex items-center gap-2 font-bold"><Wallet className="size-4 text-emerald-300" /> Your referral link</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Wallet className="size-4 text-emerald-300" /> Your referral link</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">
             Share this link. When a client submits a brief through it and the job is paid, you earn {earnings ? `${earnings.commissionPercent}%` : 'a commission'} of the job price.
           </p>
@@ -221,7 +222,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
 
         {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-          <h2 className="font-bold">My assignments</h2>
+          <AnimatedHeading as="h2" className="font-bold">My assignments</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">Jobs an admin gave you, with the price and your commission. Commission is earned when the job is marked paid.</p>
           {!earnings ? (
             <p className="mt-4 text-sm text-slate-500">Loading…</p>
