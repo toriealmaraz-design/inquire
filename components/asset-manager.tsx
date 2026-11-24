@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { ImagePlus, Loader2, Check, AlertCircle } from 'lucide-react'
@@ -41,7 +42,7 @@ export function AssetManager() {
 
   return (
     <div className="mt-8 border-t border-white/10 pt-6">
-      <h3 className="font-semibold">Brand assets</h3>
+      <AnimatedHeading as="h3" className="font-semibold">Brand assets</AnimatedHeading>
       <p className="mt-1 text-xs text-slate-500">Upload a logo or favicon. Image files up to 15 MB are supported.</p>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {(['logo', 'favicon'] as const).map((kind) => (

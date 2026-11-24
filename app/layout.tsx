@@ -2,6 +2,8 @@ import { Analytics } from '@vercel/analytics/next'
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { ChatbotWidget } from '@/components/chatbot-widget'
+import { CrosshairHud } from '@/components/crosshair-hud'
+import { SoffitBackground } from '@/components/soffit-background'
 import { BrandingProvider } from '@/components/branding'
 import { getBranding } from '@/lib/branding'
 
@@ -17,8 +19,8 @@ const staticIcons: Metadata['icons'] = {
 export async function generateMetadata(): Promise<Metadata> {
   const { faviconUrl } = await getBranding()
   return {
-    title: 'Gemini Nexus | Academic & Technical Solutions',
-    description: 'Precision academic reports, software development, web systems, and technical research solutions.',
+    title: 'Gemini Nexus | Digital Operations Network',
+    description: 'One secure Ghana-based portal for academic research, visual media, and technical systems support, with custom GHS quotes and specialist routing.',
     generator: 'v0.app',
     manifest: '/manifest.webmanifest',
     // Use the uploaded favicon when the super admin has set one; otherwise the built-in icons.
@@ -30,11 +32,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'dark',
+  themeColor: '#060B14',
 }
 
 export default async function RootLayout({
@@ -47,8 +46,10 @@ export default async function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <BrandingProvider logoUrl={logoUrl}>
-          {children}
+          <SoffitBackground />
+          <div className="relative z-10 min-h-screen">{children}</div>
           <ChatbotWidget />
+          <CrosshairHud />
         </BrandingProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

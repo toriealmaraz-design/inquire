@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { Suspense, useState } from 'react'
@@ -153,7 +154,7 @@ function AuthContent() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-[#06121d] px-5 py-10">
+    <main className="portal-page min-h-screen flex items-center justify-center bg-transparent px-5 py-10">
       {/* Background effects */}
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
@@ -165,9 +166,9 @@ function AuthContent() {
         {/* Logo & Header */}
         <div className="text-center">
           <BrandLogo alt="Gemini Nexus" className="mx-auto size-16 rounded-2xl object-cover shadow-lg" />
-          <h1 className="mt-5 text-2xl font-bold text-white">
+          <AnimatedHeading as="h1" className="mt-5 text-2xl font-bold text-white">
             {mode === 'signin' ? 'Welcome back' : 'Create account'}
-          </h1>
+          </AnimatedHeading>
           <p className="mt-2 text-sm text-slate-400">
             {mode === 'signin' 
               ? 'Sign in to access your workspace' 
@@ -324,7 +325,7 @@ function AuthContent() {
 export default function AuthPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen flex items-center justify-center bg-[#06121d]">
+      <main className="portal-page min-h-screen flex items-center justify-center bg-transparent">
         <div className="size-8 border-2 border-cyan-500/30 border-t-cyan-500 rounded-full animate-spin" />
       </main>
     }>

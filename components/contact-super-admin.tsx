@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useEffect, useState } from 'react'
 import { Mail, MessageCircle, Send, Camera, Ghost, ShieldCheck } from 'lucide-react'
 
@@ -25,7 +26,7 @@ export function ContactSuperAdmin() {
 
   return (
     <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-      <h2 className="flex items-center gap-2 font-bold"><ShieldCheck className="size-4 text-cyan-300" /> Contact the super admin</h2>
+      <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><ShieldCheck className="size-4 text-cyan-300" /> Contact the super admin</AnimatedHeading>
       <p className="mt-1 text-xs text-slate-500">For urgent issues, reach the super admin directly. Only admins can see these handles.</p>
       {links.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">The super admin hasn&apos;t added contact handles yet.</p>

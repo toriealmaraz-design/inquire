@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { Fragment, useState } from 'react'
 import { Check, Trash2, UserCheck, UserX } from 'lucide-react'
 import { FIELDS, fieldLabel } from '@/lib/fields'
@@ -90,7 +91,7 @@ export function UsersPanel({ users, loading, activeCount, pendingCount, openProf
     <div className={`${glass} mt-8 rounded-3xl p-4 sm:p-6`}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="font-bold">All Users</h2>
+          <AnimatedHeading as="h2" className="font-bold">All Users</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">Approve pending users, set roles and skill areas.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -129,7 +130,7 @@ export function UsersPanel({ users, loading, activeCount, pendingCount, openProf
               <div key={gname}>
                 {groupBy !== 'none' && (
                   <div className="mb-2 flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-cyan-200">{gname}</h3>
+                    <AnimatedHeading as="h3" className="text-sm font-bold text-cyan-200">{gname}</AnimatedHeading>
                     <span className="rounded-full bg-white/10 px-2 py-0.5 text-[11px] text-slate-400">{list.length}</span>
                     <span className="h-px flex-1 bg-white/10" />
                   </div>

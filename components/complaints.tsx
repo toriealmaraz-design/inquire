@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useEffect, useState } from 'react'
 import { AlertCircle, CheckCircle2, MessageSquareWarning, Send, Trash2 } from 'lucide-react'
 import { COMPLAINT_CATEGORIES } from '@/lib/fields'
@@ -56,7 +57,7 @@ export function ComplaintForm() {
   return (
     <div className="flex flex-col gap-5">
       <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-        <h2 className="flex items-center gap-2 font-bold"><MessageSquareWarning className="size-4 text-amber-300" /> Lodge a complaint</h2>
+        <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><MessageSquareWarning className="size-4 text-amber-300" /> Lodge a complaint</AnimatedHeading>
         <p className="mt-1 text-xs text-slate-500">Raise a problem with payments, assignments, another staff member or the system. Admins are notified straight away.</p>
         <div className="mt-4 grid gap-3 sm:grid-cols-[200px_1fr]">
           <select value={f.category} onChange={(e) => setF({ ...f, category: e.target.value })} aria-label="Category" className={`${field} h-11 bg-white/10`}>
@@ -78,7 +79,7 @@ export function ComplaintForm() {
       </div>
 
       <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-        <h2 className="font-bold">My complaints</h2>
+        <AnimatedHeading as="h2" className="font-bold">My complaints</AnimatedHeading>
         {items.length === 0 ? (
           <p className="mt-3 text-sm text-slate-500">You haven&apos;t lodged any complaints.</p>
         ) : (
@@ -135,7 +136,7 @@ export function ComplaintsInbox({ isSuperAdmin }: { isSuperAdmin: boolean }) {
     <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 font-bold"><MessageSquareWarning className="size-4 text-amber-300" /> Staff complaints</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><MessageSquareWarning className="size-4 text-amber-300" /> Staff complaints</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">{open} open · {items.length} total. Replies notify the person who raised it.</p>
         </div>
         <div className="flex rounded-xl bg-white/5 p-1 text-xs">

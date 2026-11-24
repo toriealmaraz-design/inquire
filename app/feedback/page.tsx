@@ -1,5 +1,6 @@
 'use client'
 
+import { AnimatedHeading } from '@/components/animated-heading'
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Quote, Send, Star } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
@@ -63,12 +64,12 @@ export default function FeedbackPage() {
   const field = 'w-full rounded-2xl border border-white/10 bg-black/15 px-4 py-3 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60'
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-[#06121d] text-slate-100">
+    <main className="portal-page min-h-screen overflow-x-hidden bg-transparent text-[#F8FAFC]">
       <div className="pointer-events-none fixed inset-0 -z-0 overflow-hidden">
         <div className="absolute -left-24 top-24 size-96 rounded-full bg-cyan-400/10 blur-[110px]" />
         <div className="absolute right-0 top-0 size-[34rem] rounded-full bg-indigo-500/15 blur-[140px]" />
       </div>
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#06121d]/75 backdrop-blur-xl">
+      <header className="sticky top-0 z-30 border-b border-cyan-300/10 bg-[#060B14]/75 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4 lg:px-8">
           <a href="/" className="flex items-center gap-3">
             <BrandLogo width={40} height={40} className="size-10 rounded-xl object-cover" />
@@ -79,7 +80,7 @@ export default function FeedbackPage() {
       </header>
 
       <section className="relative z-10 mx-auto max-w-5xl px-5 py-14 lg:px-8">
-        <h1 className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">What our clients say</h1>
+        <AnimatedHeading as="h1" className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">What our clients say</AnimatedHeading>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">Real feedback from people we&rsquo;ve worked with — and a space for you to share yours.</p>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -105,7 +106,7 @@ export default function FeedbackPage() {
 
           {/* Submit form */}
           <form onSubmit={submit} className="h-fit rounded-3xl border border-white/15 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur-2xl lg:sticky lg:top-24">
-            <h2 className="text-lg font-bold text-white">Leave feedback</h2>
+            <AnimatedHeading as="h2" className="text-lg font-bold text-white">Leave feedback</AnimatedHeading>
             <p className="mt-1 text-xs text-slate-500">Submissions are reviewed before they appear publicly.</p>
             <div className="mt-5 space-y-3">
               <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required placeholder="Your name" className={field} />
