@@ -98,6 +98,11 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
         setDraft({ ...defaults, ...saved, quote: { ...defaultQuote, ...saved.quote } })
       }
     } catch {}
+    // Deep links from the service cards preselect a track for this brief.
+    const requested = new URLSearchParams(window.location.search).get('track')
+    if (requested === 'academic' || requested === 'media' || requested === 'systems') {
+      setDraft((current) => ({ ...current, track: requested }))
+    }
     setHydrated(true)
   }, [])
 

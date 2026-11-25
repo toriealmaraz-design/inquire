@@ -3,7 +3,7 @@ import { PageShell } from '@/components/page-shell'
 export const metadata = { title: 'FAQ | Gemini Nexus' }
 
 const faqs = [
-  { q: 'How do I request work?', a: 'Open the intake portal on the homepage, choose a service track, describe your brief and scope, attach any files, and submit. You will receive a ticket number to track it.' },
+  { q: 'How do I request work?', a: 'Open the intake portal, choose a service track, describe your brief and scope, attach any files, and submit. The brief is completed one step at a time across separate pages, and you will receive a ticket number to track it.' },
   { q: 'How much does it cost?', a: 'Every project is quoted individually in Ghana Cedis (GHS) based on scope, complexity and urgency. There is no charge to submit a brief or receive a quote.' },
   { q: 'Do I need to pay a deposit?', a: 'No deposit is required to get a quote. Payment terms are confirmed with you before work begins.' },
   { q: 'How long will my work take?', a: 'You choose an urgency when you submit: Standard (3–5 business days), Express (24–48 hours), or Emergency (under 24 hours). Final timelines are confirmed in your quote.' },

@@ -2,7 +2,7 @@ import { MessageCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
 
 const nav = [
-  { href: '/', label: 'Intake portal' },
+  { href: '/intake', label: 'Start a brief' },
   { href: '/workflow', label: 'How it works' },
   { href: '/track', label: 'Track order' },
   { href: '/about', label: 'About' },

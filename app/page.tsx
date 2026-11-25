@@ -17,6 +17,8 @@ import {
 import { SiteFooter } from '@/components/site-footer'
 import { BrandLogo } from '@/components/branding'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
+import { QuickQuote } from '@/components/visual/quick-quote'
+import { TestimonialStrip } from '@/components/testimonial-strip'
 
 const reasons = [
   { title: 'Direct specialist routing', copy: 'Your brief goes straight to the person who knows the work — no call centre, no guessing.', icon: Zap },
@@ -62,7 +64,9 @@ export default function Page() {
           <nav className="hidden items-center gap-6 text-sm text-slate-400 md:flex">
             <a href="/workflow" className="transition hover:text-cyan-200">How it works</a>
             <a href="/about" className="transition hover:text-cyan-200">About</a>
+            <a href="/faq" className="transition hover:text-cyan-200">FAQ</a>
             <a href="/chat" className="transition hover:text-cyan-200">Agent chat</a>
+            <a href="/intake" className="portal-focus rounded-full bg-cyan-300 px-3 py-1.5 text-xs font-bold text-slate-950 transition hover:bg-cyan-200">Start a brief</a>
             <a href="/track" className="portal-focus rounded-full border border-cyan-300/35 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-100 transition hover:bg-cyan-300/20">Ticket lookup</a>
             <a href="/auth/signin" aria-label="Staff sign in" title="Staff sign in" className="portal-focus rounded-full border border-white/10 p-2 text-slate-400 transition hover:border-cyan-300/40 hover:text-cyan-300"><KeyRound className="size-4" /></a>
           </nav>
@@ -116,6 +120,9 @@ export default function Page() {
           <p className="text-xs leading-5 text-slate-400"><strong className="text-white">Private intake.</strong> Client identities stay hidden from delivery teams. Only our admins see your contact details and files.</p>
         </div>
       </section>
+
+      <QuickQuote />
+      <TestimonialStrip />
 
       <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-8">
         <div className="portal-glass flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">

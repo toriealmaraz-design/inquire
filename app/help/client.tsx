@@ -41,7 +41,7 @@ export function HelpClient({ role, status, name }: { role: string | null; status
             {groups.map((g) => (
               <div key={g.title} className="mb-3 last:mb-0">
                 <p className="text-[10px] font-bold uppercase tracking-[.14em] text-slate-500">{g.title}</p>
-                {g.sections.map((s) => <a key={s.id} href={`#${s.id}`} className="mt-1 block truncate text-xs text-slate-300 hover:text-cyan-200">{s.title}</a>)}
+                {g.sections.map((s) => <a key={s.id} href={`#${s.id}`} title={s.title} className="mt-1 block truncate text-xs text-slate-300 hover:text-cyan-200">{s.title}</a>)}
               </div>
             ))}
           </nav>

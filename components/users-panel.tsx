@@ -149,8 +149,8 @@ export function UsersPanel({ users, loading, activeCount, pendingCount, openProf
                               <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-slate-600 text-xs">{u.name[0]}</div>
                             )}
                             <div className="min-w-0">
-                              <span className="block truncate font-medium">{u.name}</span>
-                              <span className="block truncate text-[11px] text-slate-400">{u.email}</span>
+                              <span className="block truncate font-medium" title={u.name}>{u.name}</span>
+                              <span className="block truncate text-[11px] text-slate-400" title={u.email}>{u.email}</span>
                               {u.status === 'active' && u.role !== 'super_admin' && (
                                 u.onboardedAt ? (
                                   <button onClick={() => setOpenProfile(openProfile === u.id ? null : u.id)} className="text-[11px] text-cyan-300 hover:underline">

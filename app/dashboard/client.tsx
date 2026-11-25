@@ -400,7 +400,7 @@ export function DashboardClient({ user }: { user: User }) {
               </div>
             )}
             <div className="min-w-0">
-              <p className="text-sm font-bold truncate">{user.name}</p>
+              <p className="text-sm font-bold truncate" title={user.name || ''}>{user.name}</p>
               <p className="text-[10px] text-cyan-300 uppercase tracking-wider">
                 {user.role?.replace(/_/g, ' ')}
               </p>
@@ -601,7 +601,7 @@ export function DashboardClient({ user }: { user: User }) {
                           {title.replace(/^[^a-z0-9]+/i, '').charAt(0).toUpperCase() || '?'}
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold text-white">{title}</p>
+                          <p className="truncate font-semibold text-white" title={title}>{title}</p>
                           <p className="truncate text-xs text-slate-400">{g.contact && g.contact !== title ? g.contact : g.name ? '' : 'No contact given'}</p>
                         </div>
                         <div className="flex flex-wrap gap-1.5 text-[11px]">
@@ -642,7 +642,7 @@ export function DashboardClient({ user }: { user: User }) {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
-                            <span className="truncate">{briefTitle(s)}</span>
+                            <span className="truncate" title={briefTitle(s)}>{briefTitle(s)}</span>
                             <button
                               onClick={() => {
                                 const t = window.prompt('Brief title', s.title || briefTitle(s))
@@ -756,7 +756,7 @@ export function DashboardClient({ user }: { user: User }) {
                         <FileText className="size-5" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-white">{f.file_name}</p>
+                        <p className="truncate text-sm font-medium text-white" title={f.file_name}>{f.file_name}</p>
                         <p className="text-[11px] text-slate-500">
                           {f.uploaded_by === 'client' ? 'From client' : 'From staff'} · {fmtSize(f.file_size)} · {fmtTime(f.created_at)}
                         </p>
@@ -823,7 +823,7 @@ export function DashboardClient({ user }: { user: User }) {
                           <span className="font-medium text-white">{c.clientName}</span>
                           <span className="text-[10px] text-slate-500">{c.time}</span>
                         </div>
-                        <p className="truncate text-xs text-slate-400">{c.lastMessage}</p>
+                        <p className="truncate text-xs text-slate-400" title={c.lastMessage}>{c.lastMessage}</p>
                       </div>
                       {c.unread > 0 && (
                         <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-cyan-500 text-[10px] font-bold text-white">

@@ -4,6 +4,7 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { previewText } from '@/lib/text'
 import { PushPrompt } from '@/components/push-prompt'
 import { NotificationBell } from '@/components/notification-bell'
 import { SupportPresence } from '@/components/support-presence'
@@ -400,7 +401,7 @@ export function AgentChatClient({ user }: { user: User }) {
               </div>
             )}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold text-white truncate">{user.name}</p>
+              <p className="text-sm font-bold text-white truncate" title={user.name || ''}>{user.name}</p>
               <p className="text-[10px] text-cyan-300 uppercase">{user.role?.replace('_', ' ')}</p>
             </div>
             <a href="/help" title="How to use" aria-label="Help manual" className="rounded-lg p-2 text-slate-400 hover:bg-white/10 hover:text-white">
@@ -431,7 +432,7 @@ export function AgentChatClient({ user }: { user: User }) {
                 <span className="text-[10px] text-slate-500">{c.time}</span>
               </div>
               <div className="flex items-center justify-between mt-1">
-                <p className="text-xs text-slate-400 truncate pr-2">{c.lastMessage}</p>
+                <p className="text-xs text-slate-400 truncate pr-2" title={c.lastMessage}>{c.lastMessage}</p>
                 {c.unread > 0 && (
                   <span className="shrink-0 size-5 rounded-full bg-cyan-500 flex items-center justify-center text-[10px] text-white font-bold">
                     {c.unread}
@@ -472,7 +473,7 @@ export function AgentChatClient({ user }: { user: User }) {
               C
             </div>
             <div className="min-w-0">
-              <p className="truncate font-medium text-white">{activeConvoData?.clientName}</p>
+              <p className="truncate font-medium text-white" title={activeConvoData?.clientName || ''}>{activeConvoData?.clientName}</p>
               <p className={`text-xs ${peerTyping ? 'text-cyan-300' : 'text-emerald-400'}`}>{peerTyping ? 'typing…' : 'Live'}</p>
             </div>
             <div className="ml-auto flex items-center gap-1">
@@ -522,7 +523,7 @@ export function AgentChatClient({ user }: { user: User }) {
                     {replied && (
                       <div className="mb-1 rounded border-l-2 border-cyan-300/60 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
                         <span className="block font-semibold text-cyan-200">{replied.sender === 'agent' ? 'You' : 'Client'}</span>
-                        <span className="block truncate">{replied.deletedAt ? 'deleted message' : maskFiles(replied.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 80)}</span>
+                        <span className="block truncate" title={replied.deletedAt ? 'deleted message' : replied.text}>{replied.deletedAt ? 'deleted message' : previewText(maskFiles(replied.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0], 80)}</span>
                       </div>
                     )}
                     {deleted ? (
@@ -593,7 +594,7 @@ export function AgentChatClient({ user }: { user: User }) {
               <div className="mx-auto mb-2 flex max-w-2xl items-center gap-2 rounded-xl border-l-2 border-cyan-300/60 bg-white/5 px-3 py-2 text-xs">
                 <div className="min-w-0 flex-1">
                   <p className="font-semibold text-cyan-200">{editing ? 'Editing message' : `Replying to ${replyTo?.sender === 'agent' ? 'yourself' : 'client'}`}</p>
-                  <p className="truncate text-slate-400">{maskFiles((editing || replyTo)?.text || '', isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+                  <p className="truncate text-slate-400" title={(editing || replyTo)?.text}>{previewText(maskFiles((editing || replyTo)?.text || '', isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0], 90)}</p>
                 </div>
                 <button onClick={() => { setReplyTo(null); setEditing(null); setInput('') }} aria-label="Cancel" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
               </div>
@@ -640,7 +641,7 @@ export function AgentChatClient({ user }: { user: User }) {
               <AnimatedHeading as="h3" className="text-sm font-bold">Forward to…</AnimatedHeading>
               <button onClick={() => setForwarding(null)} aria-label="Close" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
             </div>
-            <p className="mb-2 truncate rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400">{maskFiles(forwarding.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+            <p className="mb-2 truncate rounded-lg bg-white/5 px-3 py-2 text-xs text-slate-400" title={forwarding.text}>{previewText(maskFiles(forwarding.text, isAdminUser).replace(/^📎 |^🎙️ /, '').split('\n')[0], 90)}</p>
             <div className="max-h-72 space-y-1 overflow-y-auto">
               {conversations.filter((c) => c.id !== activeConvo).map((c) => (
                 <button key={c.id} onClick={() => forwardTo(c.id)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-white/10">

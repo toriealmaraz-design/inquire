@@ -7,6 +7,7 @@ import { WebCall } from '@/components/web-call'
 import { Lightbox } from '@/components/lightbox'
 import { BrandLogo } from '@/components/branding'
 import { createClient } from '@/lib/supabase/client'
+import { previewText } from '@/lib/text'
 import { PRESENCE_CHANNEL } from '@/components/support-presence'
 
 type Reactions = Record<string, string[]>
@@ -653,7 +654,7 @@ export default function ChatPage() {
                       {replied && (
                         <div className="mb-1 rounded border-l-2 border-cyan-300/60 bg-black/20 px-2 py-1 text-[11px] text-slate-300">
                           <span className="block font-semibold text-cyan-200">{replied.sender === 'user' ? 'You' : 'Gemini Nexus'}</span>
-                          <span className="block truncate">{replied.deletedAt ? 'deleted message' : replied.text.replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 80)}</span>
+                          <span className="block truncate" title={replied.deletedAt ? 'deleted message' : replied.text}>{replied.deletedAt ? 'deleted message' : previewText(replied.text.replace(/^📎 |^🎙️ /, '').split('\n')[0], 80)}</span>
                         </div>
                       )}
                       {deleted ? (
@@ -757,7 +758,7 @@ export default function ChatPage() {
           <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-xl border-l-2 border-cyan-300/60 bg-white/5 px-3 py-2 text-xs">
             <div className="min-w-0 flex-1">
               <p className="font-semibold text-cyan-200">{editing ? 'Editing message' : `Replying to ${replyTo?.sender === 'user' ? 'yourself' : 'Gemini Nexus'}`}</p>
-              <p className="truncate text-slate-400">{(editing || replyTo)?.text.replace(/^📎 |^🎙️ /, '').split('\n')[0].slice(0, 90)}</p>
+              <p className="truncate text-slate-400" title={(editing || replyTo)?.text}>{previewText((editing || replyTo)?.text.replace(/^📎 |^🎙️ /, '').split('\n')[0] ?? '', 90)}</p>
             </div>
             <button onClick={() => { setReplyTo(null); setEditing(null); setInput('') }} aria-label="Cancel" className="rounded-full p-1 text-slate-400 hover:bg-white/10 hover:text-white"><X className="size-4" /></button>
           </div>

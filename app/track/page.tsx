@@ -98,7 +98,7 @@ export default function TrackPage() {
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">{result.ticketId}</p>
-                <AnimatedHeading as="h2" className="mt-1 truncate text-lg font-semibold text-white">{result.title}</AnimatedHeading>
+                <AnimatedHeading as="h2" className="mt-1 break-words text-lg font-semibold text-white">{result.title}</AnimatedHeading>
                 <p className="text-sm text-slate-400">{result.serviceType}</p>
               </div>
               <span className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">{result.status}</span>

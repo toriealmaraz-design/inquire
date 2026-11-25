@@ -113,7 +113,7 @@ export function QuoteEstimator({
             ['48-Hour', 'Priority'],
             ['24-Hour Priority', '+25%'],
           ].map(([value, description]) => (
-            <button key={value} type="button" aria-pressed={urgency === value} onClick={() => setUrgency(value)} className={`rounded-xl border px-2 py-2.5 text-left transition ${urgency === value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20'}`}>
+            <button key={value} type="button" aria-pressed={urgency === value} onClick={() => setUrgency(value)} className={`rounded-xl border px-1.5 py-2.5 text-left transition sm:px-2 ${urgency === value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20'}`}>
               <span className="block text-[11px] font-bold">{value === '24-Hour Priority' ? '24 hours' : value === '48-Hour' ? '48 hours' : 'Standard'}</span>
               <span className="mt-0.5 block text-[10px]">{description}</span>
             </button>
