@@ -45,15 +45,17 @@ export function QuoteEstimator({
   urgency,
   setUrgency,
   onChange,
+  initial,
 }: {
   urgency: string
   setUrgency: (value: string) => void
   onChange: (selection: QuoteSelection) => void
+  initial?: QuoteSelection
 }) {
-  const [categoryId, setCategoryId] = useState<CategoryId>('proofreading')
-  const [academicLevel, setAcademicLevel] = useState('Undergraduate')
-  const [volume, setVolume] = useState(6)
-  const [citationAudit, setCitationAudit] = useState(false)
+  const [categoryId, setCategoryId] = useState<CategoryId>(() => categories.find((item) => item.title === initial?.category)?.id ?? 'proofreading')
+  const [academicLevel, setAcademicLevel] = useState(initial?.academicLevel ?? 'Undergraduate')
+  const [volume, setVolume] = useState(initial?.volume ?? 6)
+  const [citationAudit, setCitationAudit] = useState(initial?.citationAudit ?? false)
   const selected = categories.find((item) => item.id === categoryId) ?? categories[0]
 
   const selection = useMemo(() => {
