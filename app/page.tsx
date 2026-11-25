@@ -87,7 +87,10 @@ export default function Page() {
         <video className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-25" src="/assets/material-hills.mp4" autoPlay muted loop playsInline preload="none" aria-hidden="true" />
         <div className="hero-glow">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200"><Sparkles className="size-3.5" /> Ghana operational · custom GHS quotes</span>
-          <AnimatedHeading as="h1" style={{ justifyContent: 'flex-start' }} className="hero-title mt-6 text-[clamp(2rem,9vw,4.5rem)] font-bold leading-[1.05] tracking-[-.05em]">Serious work. Right specialist.</AnimatedHeading>
+          <h1 className="hero-title mt-6 text-[clamp(2rem,9vw,4.5rem)] font-bold tracking-[-.05em]">
+            <AnimatedHeading as="span" variant="words" className="hero-sentence" style={{ flexWrap: 'nowrap', columnGap: '0.25em', justifyContent: 'flex-start' }}>Serious work.</AnimatedHeading>{' '}
+            <AnimatedHeading as="span" variant="words" className="hero-sentence" style={{ flexWrap: 'nowrap', columnGap: '0.25em', justifyContent: 'flex-start' }}>Right specialist.</AnimatedHeading>
+          </h1>
           <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">One secure intake line for research coaching, visual media, and technical consulting. Work with a specialist to solve problems, strengthen your skills, and improve your own deliverables.</p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a href="/intake" className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 shadow-[0_0_28px_rgba(0,240,255,0.28)] transition hover:bg-cyan-200">Start a brief <ArrowRight className="size-4" /></a>

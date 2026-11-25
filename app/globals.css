@@ -276,8 +276,14 @@
   filter: blur(26px);
 }
 
-.hero-title,
-.hero-title-accent {
+/* The headline stays one semantic sentence. Two unbreakable sentence units flow
+   side by side on wide screens and stack cleanly on small screens, with flex
+   gaps that match a natural word space in both rendered and hydrated states. */
+.hero-title {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: 0.25em;
+  line-height: 1.2;
   color: var(--gn-ink);
   background: linear-gradient(104deg, #f8fafc 8%, #a5f3fc 48%, #67e8f9 78%, #f8fafc 100%);
   -webkit-background-clip: text;
@@ -285,10 +291,18 @@
   -webkit-text-fill-color: transparent;
 }
 
-.hero-line {
+.hero-sentence {
   display: flex;
   flex-wrap: nowrap;
-  width: 100%;
+  justify-content: flex-start;
+  column-gap: 0.25em;
+  white-space: nowrap;
+}
+
+@media (max-width: 639px) {
+  .hero-sentence {
+    width: 100%;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
