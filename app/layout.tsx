@@ -6,6 +6,9 @@ import { BrandingProvider } from '@/components/branding'
 import { getBranding } from '@/lib/branding'
 import { SoffitBackground } from '@/components/visual/soffit-background'
 import { DotRingCursor } from '@/components/visual/dot-ring-cursor'
+import { PageTransition } from '@/components/visual/page-transition'
+import { CommandBar } from '@/components/command-bar'
+import { NexusHud } from '@/components/nexus-hud'
 
 const staticIcons: Metadata['icons'] = {
   icon: [
@@ -49,6 +52,9 @@ export default async function RootLayout({
           <SoffitBackground />
           <div className="relative z-10 min-h-screen">{children}</div>
           <ChatbotWidget />
+          <NexusHud />
+          <CommandBar />
+          <PageTransition />
           <DotRingCursor />
         </BrandingProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}

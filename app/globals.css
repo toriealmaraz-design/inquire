@@ -305,11 +305,60 @@
   }
 }
 
+/* ── Motion layer: command menu, route veil, scroll reveals ─────────────── */
+@keyframes command-in {
+  from { opacity: 0; transform: translateY(-12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes veil-sweep {
+  0% { transform: scaleY(1); opacity: 0.5; }
+  100% { transform: scaleY(0); opacity: 0; }
+}
+
+.nexus-command-panel {
+  background-image:
+    radial-gradient(90% 60% at 100% 0%, rgba(0, 240, 255, 0.08), transparent 70%),
+    linear-gradient(180deg, rgba(10, 15, 28, 0.98), rgba(6, 11, 20, 0.98));
+}
+
+.page-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  pointer-events: none;
+  transform-origin: top;
+  background: linear-gradient(180deg, rgba(0, 240, 255, 0.18), rgba(6, 11, 20, 0.72) 42%, rgba(0, 240, 255, 0.04));
+  animation: veil-sweep 620ms cubic-bezier(0.7, 0, 0.2, 1) forwards;
+}
+
+.reveal {
+  transition: opacity 700ms cubic-bezier(0.2, 0.8, 0.2, 1), transform 700ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.reveal-pending {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .portal-glass-hover {
     transition: none;
   }
   .portal-glass-hover:hover {
     transform: none;
+  }
+  .reveal,
+  .reveal-pending {
+    transition: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .page-veil {
+    display: none;
+  }
+  .animate-pulse,
+  .nexus-command-panel {
+    animation: none !important;
   }
 }

@@ -104,7 +104,7 @@ export function ChatbotWidget() {
     const hit = match(q, replies)
     if (hit) return { from: 'bot', text: hit.reply }
     if (HUMAN.test(q)) return { from: 'bot', text: 'Sure, our team is available in Live Chat. Your question will be ready to send.', handoff: q }
-    if (BRIEF.test(q)) return { from: 'bot', text: 'You can submit a brief on the homepage in three quick steps (track, details, contact). You get a custom GHS quote with no deposit.', brief: true }
+    if (BRIEF.test(q)) return { from: 'bot', text: 'You can submit a brief through the intake portal in three quick steps — track, brief, dispatch. You get a custom GHS quote with no deposit.', brief: true }
     if (GREETINGS.test(q)) return { from: 'bot', text: 'Hello! How can I help? You can ask about prices, deadlines, files, payment or your brief status.' }
     if (THANKS.test(q) && q.length < 25) return { from: 'bot', text: "You're welcome! Anything else I can help with?" }
 
@@ -173,7 +173,7 @@ export function ChatbotWidget() {
                     </a>
                   )}
                   {l.brief && (
-                    <a href="/#intake" onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300">
+                    <a href="/intake" onClick={() => setOpen(false)} className="mt-2 flex items-center justify-center gap-1.5 rounded-xl bg-cyan-400 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-300">
                       <FileText className="size-3.5" /> Start a brief
                     </a>
                   )}

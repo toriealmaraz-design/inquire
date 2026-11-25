@@ -240,22 +240,21 @@ export function SoffitBackground() {
     window.addEventListener('pointerdown', aim, { passive: true })
 
     let visible = true
-    const observer = new IntersectionObserver((entries) => { visible = entries[0]?.isIntersecting ?? true }, { threshold: 0 })
-    observer.observe(canvas)
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)')
     let previousTime = performance.now()
     let clock = 0
     let frameId = 0
 
     const frame = (now: number) => {
-      frameId = window.requestAnimationFrame(frame)
+      // Fully stop the RAF loop while the tab is hidden or the canvas is offscreen.
+      if (document.hidden || !visible) {
+        frameId = 0
+        previousTime = now
+        return
+      }
       if (resizeQueued) {
         resizeQueued = false
         resize()
-      }
-      if (!visible || document.hidden) {
-        previousTime = now
-        return
       }
       const raw = now - previousTime
       previousTime = now
@@ -273,7 +272,21 @@ export function SoffitBackground() {
       uniform1f('iTime', clock)
       uniform2f('iMouse', pointer.x, pointer.y)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
+      frameId = window.requestAnimationFrame(frame)
     }
+
+    const resume = () => {
+      if (frameId || document.hidden || !visible) return
+      previousTime = performance.now()
+      frameId = window.requestAnimationFrame(frame)
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      visible = entries[0]?.isIntersecting ?? true
+      resume()
+    }, { threshold: 0 })
+    observer.observe(canvas)
+    document.addEventListener('visibilitychange', resume)
 
     resize()
     uniform1f('iTime', 0)
@@ -286,6 +299,7 @@ export function SoffitBackground() {
       window.removeEventListener('resize', onResize)
       window.removeEventListener('pointermove', aim)
       window.removeEventListener('pointerdown', aim)
+      document.removeEventListener('visibilitychange', resume)
       observer.disconnect()
       if (program) gl.deleteProgram(program)
     }

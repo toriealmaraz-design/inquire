@@ -19,6 +19,9 @@ import { BrandLogo } from '@/components/branding'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { QuickQuote } from '@/components/visual/quick-quote'
 import { TestimonialStrip } from '@/components/testimonial-strip'
+import { ServiceConstellation } from '@/components/service-constellation'
+import { Reveal } from '@/components/visual/reveal'
+import { Magnetic } from '@/components/visual/magnetic'
 
 const reasons = [
   { title: 'Direct specialist routing', copy: 'Your brief goes straight to the person who knows the work — no call centre, no guessing.', icon: Zap },
@@ -97,42 +100,47 @@ export default function Page() {
           </h1>
           <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">One secure intake line for research coaching, visual media, and technical consulting. Work with a specialist to solve problems, strengthen your skills, and improve your own deliverables.</p>
           <div className="mt-8 flex flex-wrap gap-3">
-            <a href="/intake" className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 shadow-[0_0_28px_rgba(0,240,255,0.28)] transition hover:bg-cyan-200">Start a brief <ArrowRight className="size-4" /></a>
-            <a href="/track" className="portal-focus inline-flex items-center gap-2 rounded-xl border border-[rgba(0,240,255,0.14)] bg-white/[.04] px-6 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/40"><Search className="size-4" /> Track a ticket</a>
+            <Magnetic><a href="/intake" data-cursor-label="START" className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 shadow-[0_0_28px_rgba(0,240,255,0.28)] transition hover:bg-cyan-200">Start a brief <ArrowRight className="size-4" /></a></Magnetic>
+            <Magnetic><a href="/track" className="portal-focus inline-flex items-center gap-2 rounded-xl border border-[rgba(0,240,255,0.14)] bg-white/[.04] px-6 py-3 text-sm font-bold text-slate-200 transition hover:border-cyan-300/40"><Search className="size-4" /> Track a ticket</a></Magnetic>
           </div>
         </div>
       </section>
 
       <section aria-labelledby="why-nexus" className="mx-auto max-w-7xl px-5 pb-16 lg:px-8">
-        <AnimatedHeading as="h2" id="why-nexus" className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Why teams use Nexus</AnimatedHeading>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">A faster route from a rough idea to the right expert — with the safeguards academic and technical work needs.</p>
-        <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {reasons.map(({ title, copy, icon: Icon }) => (
-            <article key={title} className="portal-glass portal-glass-hover rounded-2xl p-5">
-              <span className="flex size-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-300"><Icon className="size-5" /></span>
-              <h3 className="mt-4 text-sm font-bold text-white">{title}</h3>
-              <p className="mt-2 text-xs leading-5 text-slate-400">{copy}</p>
-            </article>
-          ))}
-        </div>
-        <div className="portal-glass mt-4 flex flex-wrap items-center gap-3 rounded-2xl px-5 py-4">
-          <ShieldCheck className="size-5 shrink-0 text-emerald-300" />
-          <p className="text-xs leading-5 text-slate-400"><strong className="text-white">Private intake.</strong> Client identities stay hidden from delivery teams. Only our admins see your contact details and files.</p>
-        </div>
+        <Reveal>
+          <AnimatedHeading as="h2" id="why-nexus" className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Why teams use Nexus</AnimatedHeading>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">A faster route from a rough idea to the right expert — with the safeguards academic and technical work needs.</p>
+          <div className="mt-7 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {reasons.map(({ title, copy, icon: Icon }) => (
+              <article key={title} className="portal-glass portal-glass-hover rounded-2xl p-5">
+                <span className="flex size-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-300/10 text-cyan-300"><Icon className="size-5" /></span>
+                <h3 className="mt-4 text-sm font-bold text-white">{title}</h3>
+                <p className="mt-2 text-xs leading-5 text-slate-400">{copy}</p>
+              </article>
+            ))}
+          </div>
+          <div className="portal-glass mt-4 flex flex-wrap items-center gap-3 rounded-2xl px-5 py-4">
+            <ShieldCheck className="size-5 shrink-0 text-emerald-300" />
+            <p className="text-xs leading-5 text-slate-400"><strong className="text-white">Private intake.</strong> Client identities stay hidden from delivery teams. Only our admins see your contact details and files.</p>
+          </div>
+        </Reveal>
       </section>
 
+      <ServiceConstellation />
       <QuickQuote />
       <TestimonialStrip />
 
       <section className="mx-auto max-w-7xl px-5 pb-24 lg:px-8">
-        <div className="portal-glass flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Three focused steps</p>
-            <AnimatedHeading as="h2" className="mt-2 text-xl font-bold text-white">Scope, brief, dispatch — each on its own page.</AnimatedHeading>
-            <p className="mt-2 text-sm text-slate-400">Your progress is saved as you go. Nothing goes to payment before a specialist confirms the quote.</p>
+        <Reveal>
+          <div className="portal-glass flex flex-col items-start justify-between gap-5 rounded-3xl p-7 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Three focused steps</p>
+              <AnimatedHeading as="h2" className="mt-2 text-xl font-bold text-white">Scope, brief, dispatch — each on its own page.</AnimatedHeading>
+              <p className="mt-2 text-sm text-slate-400">Your progress is saved as you go. Nothing goes to payment before a specialist confirms the quote.</p>
+            </div>
+            <Magnetic><a href="/intake" className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">Open intake <ArrowRight className="size-4" /></a></Magnetic>
           </div>
-          <a href="/intake" className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">Open intake <ArrowRight className="size-4" /></a>
-        </div>
+        </Reveal>
       </section>
 
       <SiteFooter />

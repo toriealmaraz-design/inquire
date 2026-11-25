@@ -2,23 +2,14 @@
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useState, useEffect } from 'react'
-import { ArrowLeft, Search, PackageCheck, Loader2, AlertCircle, CheckCircle2, Circle } from 'lucide-react'
+import { ArrowLeft, Search, Loader2, AlertCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
 import { SiteFooter } from '@/components/site-footer'
+import { TicketTimeline } from '@/components/ticket-timeline'
 
 type Result =
   | { found: true; ticketId: string; serviceType: string; title: string; status: string; createdAt: string }
   | { found: false; ticketId: string }
-
-// Map a brief's status to a 4-step progress stage (0-3).
-function stageOf(status: string): number {
-  const s = status.toLowerCase()
-  if (s.includes('paid') || s.includes('complete') || s.includes('delivered')) return 3
-  if (s.includes('progress') || s.includes('assigned') || s.includes('working')) return 2
-  if (s.includes('quote') && !s.includes('pending')) return 1
-  return 0
-}
-const STEPS = ['Received', 'Quoted', 'In progress', 'Completed']
 
 export default function TrackPage() {
   const [ticket, setTicket] = useState('')
@@ -55,7 +46,6 @@ export default function TrackPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const stage = result?.found ? stageOf(result.status) : 0
   const field = 'h-12 w-full rounded-2xl border border-white/10 bg-black/15 px-4 text-sm text-white outline-none placeholder:text-slate-600 focus:border-cyan-300/60'
 
   return (
@@ -104,19 +94,7 @@ export default function TrackPage() {
               <span className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">{result.status}</span>
             </div>
 
-            {/* Progress stepper */}
-            <ol className="mt-8 space-y-4">
-              {STEPS.map((label, i) => {
-                const done = i < stage
-                const current = i === stage
-                return (
-                  <li key={label} className="flex items-center gap-3">
-                    {done ? <CheckCircle2 className="size-5 text-emerald-400" /> : current ? <PackageCheck className="size-5 text-cyan-300" /> : <Circle className="size-5 text-slate-600" />}
-                    <span className={`text-sm ${done ? 'text-emerald-200' : current ? 'font-semibold text-white' : 'text-slate-500'}`}>{label}{current ? ' — current' : ''}</span>
-                  </li>
-                )
-              })}
-            </ol>
+            <TicketTimeline status={result.status} createdAt={result.createdAt} ticketId={result.ticketId} />
 
             <p className="mt-6 border-t border-white/10 pt-4 text-xs text-slate-500">Submitted {new Date(result.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · For details or changes, <a href={`/chat?ticket=${encodeURIComponent(result.ticketId)}`} className="text-cyan-300 underline">continue in Live Chat</a>.</p>
           </div>

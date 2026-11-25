@@ -361,7 +361,7 @@ export default function ChatPage() {
   const send = async (preset?: string) => {
     const text = (preset ?? input).trim()
     if (!text || sending) return
-    if (!supabase) return setError('Chat is not available right now. Please submit a brief from the homepage instead.')
+    if (!supabase) return setError('Chat is not available right now. Please submit a brief through the intake portal instead.')
 
     // Editing an existing message
     if (editing && typeof editing.id === 'number') {
