@@ -3,7 +3,7 @@
 import { createElement, useSyncExternalStore, type HTMLAttributes, type ReactNode } from "react";
 import TextEngine from "spring-text-engine";
 
-type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
+type HeadingTag = "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "span";
 
 export type AnimatedHeadingProps = HTMLAttributes<HTMLHeadingElement> & {
   as: HeadingTag;

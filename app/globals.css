@@ -276,12 +276,19 @@
   filter: blur(26px);
 }
 
-.hero-title {
+.hero-title,
+.hero-title-accent {
   color: var(--gn-ink);
   background: linear-gradient(104deg, #f8fafc 8%, #a5f3fc 48%, #67e8f9 78%, #f8fafc 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.hero-line {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 @media (prefers-reduced-motion: reduce) {
