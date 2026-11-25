@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useState } from 'react'
 import { Bot, Plus, Trash2, Save, Check, ChevronUp, ChevronDown } from 'lucide-react'
@@ -87,7 +88,7 @@ export function ChatbotSettings() {
     <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="flex items-center gap-2 font-bold"><Bot className="size-4 text-cyan-300" /> Chatbot &amp; automatic replies</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Bot className="size-4 text-cyan-300" /> Chatbot &amp; automatic replies</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">
             Nexa uses these approved answers on the homepage and in Live Chat. When admins are away, it replies while alerting all active admins every 3 minutes until a human responds.
           </p>

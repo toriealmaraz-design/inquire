@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useState } from 'react'
 import { Megaphone, Send } from 'lucide-react'
@@ -75,7 +76,7 @@ export function Announcements({ role, field, limit }: { role?: string | null; fi
     <div className="flex flex-col gap-6">
       {canPost && (
         <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-          <h2 className="flex items-center gap-2 font-bold"><Megaphone className="size-4 text-cyan-300" /> New announcement</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Megaphone className="size-4 text-cyan-300" /> New announcement</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">
             {isSuperAdmin ? 'Send to all staff or one field.' : field ? `Goes to staff in ${fieldLabel(field)}.` : ''}
           </p>
@@ -130,7 +131,7 @@ export function Announcements({ role, field, limit }: { role?: string | null; fi
       )}
 
       <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-        <h2 className="font-bold">Announcements</h2>
+        <AnimatedHeading as="h2" className="font-bold">Announcements</AnimatedHeading>
         {loading ? (
           <p className="mt-4 text-sm text-slate-500">Loading…</p>
         ) : shown.length === 0 ? (

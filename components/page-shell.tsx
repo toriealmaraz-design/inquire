@@ -1,3 +1,4 @@
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 import type { ReactNode } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import { SiteFooter } from '@/components/site-footer'
@@ -24,7 +25,7 @@ export function PageShell({ title, subtitle, children }: { title: string; subtit
         </div>
       </header>
       <section className="relative z-10 mx-auto w-full max-w-3xl flex-1 px-5 py-14 lg:px-8">
-        <h1 className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">{title}</h1>
+        <AnimatedHeading as="h1" className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">{title}</AnimatedHeading>
         {subtitle && <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">{subtitle}</p>}
         <div className="mt-10 space-y-8 text-sm leading-7 text-slate-300">{children}</div>
       </section>
@@ -37,7 +38,7 @@ export function PageShell({ title, subtitle, children }: { title: string; subtit
 export function Block({ heading, children }: { heading: string; children: ReactNode }) {
   return (
     <div>
-      <h2 className="text-lg font-bold text-white">{heading}</h2>
+      <AnimatedHeading as="h2" className="text-lg font-bold text-white">{heading}</AnimatedHeading>
       <div className="mt-3 space-y-3 text-slate-400">{children}</div>
     </div>
   )

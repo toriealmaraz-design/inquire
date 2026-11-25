@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Clock3, FileText, Plus } from 'lucide-react'
@@ -79,7 +80,7 @@ export function QuoteEstimator({
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className="text-xs font-bold uppercase tracking-[.16em] text-cyan-300">Instant estimate</p>
-          <h3 id="quote-estimator-title" className="mt-1 text-base font-bold text-white">Shape your consultation</h3>
+          <AnimatedHeading as="h3" id="quote-estimator-title" className="mt-1 text-base font-bold text-white">Shape your consultation</AnimatedHeading>
         </div>
         <span className="flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-300"><Clock3 className="size-3.5" /> GHS</span>
       </div>

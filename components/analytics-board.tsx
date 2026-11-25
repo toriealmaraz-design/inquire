@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, BellRing, Bot, Clock, FileText, MessageCircle, RefreshCw, TrendingDown, TrendingUp, Trophy, UserCheck, Users, Wallet } from 'lucide-react'
@@ -108,7 +109,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
       <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="font-bold">Last 30 days</h2>
+            <AnimatedHeading as="h2" className="font-bold">Last 30 days</AnimatedHeading>
             <p className="mt-0.5 text-xs text-slate-500">
               {hovered ? `${new Date(hovered.day).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}: ${hovered.briefs} brief${hovered.briefs === 1 ? '' : 's'} · ${ghs(hovered.revenue)} paid` : 'Hover or tap a bar for the day’s numbers'}
             </p>
@@ -148,7 +149,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Pipeline */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="font-bold">Job pipeline</h3>
+          <AnimatedHeading as="h3" className="font-bold">Job pipeline</AnimatedHeading>
           <div className="mt-4 flex h-3 overflow-hidden rounded-full bg-white/5">
             {pipeline.map((p) => p.n > 0 && <span key={p.label} className={p.color} style={{ width: `${(p.n / Math.max(1, t.total)) * 100}%` }} />)}
           </div>
@@ -165,7 +166,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
 
         {/* By field */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="font-bold">By service track</h3>
+          <AnimatedHeading as="h3" className="font-bold">By service track</AnimatedHeading>
           {data.byField.length === 0 ? <p className="mt-4 text-sm text-slate-500">No briefs yet.</p> : (
             <ul className="mt-4 space-y-3">
               {data.byField.map((f) => (
@@ -176,7 +177,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
               ))}
             </ul>
           )}
-          <h4 className="mt-5 text-xs font-semibold text-slate-400">Urgency mix</h4>
+          <AnimatedHeading as="h4" className="mt-5 text-xs font-semibold text-slate-400">Urgency mix</AnimatedHeading>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {data.urgency.map((u) => <span key={u.urgency} className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-300">{u.urgency} {Math.round((u.n / urgencyTotal) * 100)}%</span>)}
           </div>
@@ -184,7 +185,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
 
         {/* Money */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="font-bold">Money</h3>
+          <AnimatedHeading as="h3" className="font-bold">Money</AnimatedHeading>
           <ul className="mt-4 space-y-3 text-sm">
             <li className="flex justify-between"><span className="text-slate-400">Revenue (all time)</span><strong>{ghs(m.revenue)}</strong></li>
             <li className="flex justify-between"><span className="text-slate-400">Last month</span><strong>{ghs(m.revenue_prev_month)}</strong></li>
@@ -198,7 +199,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Chat */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="flex items-center gap-2 font-bold"><MessageCircle className="size-4 text-cyan-300" /> Live chat</h3>
+          <AnimatedHeading as="h3" className="flex items-center gap-2 font-bold"><MessageCircle className="size-4 text-cyan-300" /> Live chat</AnimatedHeading>
           <div className="mt-4 grid grid-cols-2 gap-3 text-center">
             {[
               ['Conversations', c.conversations],
@@ -212,7 +213,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
 
         {/* Team */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="flex items-center gap-2 font-bold"><Users className="size-4 text-violet-300" /> Team</h3>
+          <AnimatedHeading as="h3" className="flex items-center gap-2 font-bold"><Users className="size-4 text-violet-300" /> Team</AnimatedHeading>
           <ul className="mt-4 space-y-2.5 text-sm">
             <li className="flex justify-between"><span className="text-slate-400">Active agents</span><strong>{s.agents}</strong></li>
             <li className="flex justify-between"><span className="text-slate-400">Admins &amp; leads</span><strong>{s.admins}</strong></li>
@@ -220,7 +221,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
             <li className="flex justify-between"><span className="text-slate-400">Questionnaire not done</span><strong>{s.not_onboarded}</strong></li>
             <li className="flex justify-between"><span className="flex items-center gap-1 text-slate-400"><BellRing className="size-3.5" /> Push notifications on</span><strong>{s.push_enabled}</strong></li>
           </ul>
-          <h4 className="mt-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400"><Trophy className="size-3.5 text-amber-300" /> Top performers</h4>
+          <AnimatedHeading as="h4" className="mt-5 flex items-center gap-1.5 text-xs font-semibold text-slate-400"><Trophy className="size-3.5 text-amber-300" /> Top performers</AnimatedHeading>
           {data.topAgents.length === 0 ? <p className="mt-2 text-xs text-slate-500">No assigned jobs yet.</p> : (
             <ol className="mt-2 space-y-1.5 text-xs">
               {data.topAgents.map((a, i) => <li key={a.name} className="flex justify-between"><span className="text-slate-300">{i + 1}. {a.name}</span><span className="text-slate-400">{a.paid} paid · {a.active} active</span></li>)}
@@ -230,7 +231,7 @@ export function AnalyticsBoard({ onNavigate }: { onNavigate?: (tab: string) => v
 
         {/* Chatbot gaps */}
         <div className={`${glass} rounded-3xl p-5`}>
-          <h3 className="flex items-center gap-2 font-bold"><AlertTriangle className="size-4 text-amber-300" /> Chatbot gaps</h3>
+          <AnimatedHeading as="h3" className="flex items-center gap-2 font-bold"><AlertTriangle className="size-4 text-amber-300" /> Chatbot gaps</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">Questions clients asked that the bot couldn&apos;t answer.</p>
           {data.misses.length === 0 ? <p className="mt-4 text-sm text-slate-500">None. The bot is answering everything.</p> : (
             <ul className="mt-3 space-y-2 text-sm">

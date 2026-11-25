@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
@@ -150,7 +151,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
         <RoleWatcher role={user.role} field={user.field} />
         <div className="mt-6"><PushPrompt showTest /></div>
 
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</h1>
+        <AnimatedHeading as="h1" className="mt-2 text-3xl font-bold tracking-tight">Agent Portal</AnimatedHeading>
         <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <a href="/onboarding" className="text-cyan-300 hover:underline">Edit my skills profile →</a>
           <a href="/complaints" className="text-amber-300 hover:underline">Lodge a complaint →</a>
@@ -177,7 +178,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
 
         {/* Referral link + commission */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-          <h2 className="flex items-center gap-2 font-bold"><Wallet className="size-4 text-emerald-300" /> Your referral link</h2>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Wallet className="size-4 text-emerald-300" /> Your referral link</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">
             Share this link. When a client submits a brief through it and the job is paid, you earn {earnings ? `${earnings.commissionPercent}%` : 'a commission'} of the job price.
           </p>
@@ -221,7 +222,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
 
         {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-          <h2 className="font-bold">My assignments</h2>
+          <AnimatedHeading as="h2" className="font-bold">My assignments</AnimatedHeading>
           <p className="mt-1 text-xs text-slate-500">Jobs an admin gave you, with the price and your commission. Commission is earned when the job is marked paid.</p>
           {!earnings ? (
             <p className="mt-4 text-sm text-slate-500">Loading…</p>

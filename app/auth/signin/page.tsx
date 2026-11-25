@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -165,9 +166,9 @@ function AuthContent() {
         {/* Logo & Header */}
         <div className="text-center">
           <BrandLogo alt="Gemini Nexus" className="mx-auto size-16 rounded-2xl object-cover shadow-lg" />
-          <h1 className="mt-5 text-2xl font-bold text-white">
+          <AnimatedHeading as="h1" className="mt-5 text-2xl font-bold text-white">
             {mode === 'signin' ? 'Welcome back' : 'Create account'}
-          </h1>
+          </AnimatedHeading>
           <p className="mt-2 text-sm text-slate-400">
             {mode === 'signin' 
               ? 'Sign in to access your workspace' 

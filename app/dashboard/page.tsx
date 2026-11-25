@@ -1,3 +1,4 @@
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { redirect } from 'next/navigation'
 import { needsOnboarding, getPageUser, isAdmin } from '@/lib/auth'
 import { DashboardClient } from './client'
@@ -28,7 +29,7 @@ export default async function DashboardPage() {
           <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-amber-300/15 text-amber-300">
             <svg className="size-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </div>
-          <h1 className="mt-6 text-xl font-bold text-white">Awaiting Approval</h1>
+          <AnimatedHeading as="h1" className="mt-6 text-xl font-bold text-white">Awaiting Approval</AnimatedHeading>
           <p className="mt-2 text-sm text-slate-400">Your account is pending admin approval. You'll be notified once approved.</p>
           <p className="mt-4 text-xs text-slate-500">Signed in as: {email}</p>
           <SignOutButton />
@@ -49,7 +50,7 @@ export default async function DashboardPage() {
           <div className="mx-auto flex size-16 items-center justify-center rounded-full bg-rose-300/15 text-rose-300">
             <svg className="size-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
           </div>
-          <h1 className="mt-6 text-xl font-bold text-white">Account Disabled</h1>
+          <AnimatedHeading as="h1" className="mt-6 text-xl font-bold text-white">Account Disabled</AnimatedHeading>
           <p className="mt-2 text-sm text-slate-400">Your account has been disabled. Contact admin if this is a mistake.</p>
           <SignOutButton />
         </div>

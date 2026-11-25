@@ -4,6 +4,8 @@ import './globals.css'
 import { ChatbotWidget } from '@/components/chatbot-widget'
 import { BrandingProvider } from '@/components/branding'
 import { getBranding } from '@/lib/branding'
+import { SoffitBackground } from '@/components/visual/soffit-background'
+import { DotRingCursor } from '@/components/visual/dot-ring-cursor'
 
 const staticIcons: Metadata['icons'] = {
   icon: [
@@ -30,11 +32,8 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   viewportFit: 'cover',
-  colorScheme: 'light dark',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: 'white' },
-    { media: '(prefers-color-scheme: dark)', color: 'black' },
-  ],
+  colorScheme: 'dark',
+  themeColor: '#060B14',
 }
 
 export default async function RootLayout({
@@ -47,8 +46,10 @@ export default async function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <BrandingProvider logoUrl={logoUrl}>
-          {children}
+          <SoffitBackground />
+          <div className="relative z-10 min-h-screen">{children}</div>
           <ChatbotWidget />
+          <DotRingCursor />
         </BrandingProvider>
         {process.env.NODE_ENV === 'production' && <Analytics />}
       </body>

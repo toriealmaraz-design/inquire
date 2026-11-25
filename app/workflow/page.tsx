@@ -1,3 +1,4 @@
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { ArrowRight, BookOpen, CheckCircle2, ClipboardList, Coins, KeyRound, LockKeyhole, MessageCircle, Palette, ShieldCheck, Sparkles, Users, Wrench } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
 import { SiteFooter } from '@/components/site-footer'
@@ -54,11 +55,11 @@ export default function WorkflowPage() {
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200">
             <ShieldCheck className="size-3.5" /> One secure line from brief to delivery
           </span>
-          <h1 className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-6xl">
+          <AnimatedHeading as="h1" className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-6xl">
             How it works.
             <br />
             <span className="bg-gradient-to-r from-cyan-200 via-white to-indigo-300 bg-clip-text text-transparent">Clear at every step.</span>
-          </h1>
+          </AnimatedHeading>
           <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">
             Every request is received, quoted, routed to the right specialist, completed with oversight and delivered, all through one accountable workflow.
           </p>
@@ -75,7 +76,7 @@ export default function WorkflowPage() {
                 </span>
                 <span className="text-xs font-bold tracking-[.16em] text-slate-600">{String(i + 1).padStart(2, '0')}</span>
               </div>
-              <h2 className="mt-5 text-base font-bold text-white">{title}</h2>
+              <AnimatedHeading as="h2" className="mt-5 text-base font-bold text-white">{title}</AnimatedHeading>
               <p className="mt-2 text-sm leading-6 text-slate-400">{description}</p>
             </li>
           ))}
@@ -86,7 +87,7 @@ export default function WorkflowPage() {
         <div className={`${glass} rounded-[2rem] p-6 sm:p-8`}>
           <div className="max-w-2xl">
             <p className="text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Specialist routing</p>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">The right team for the right kind of work.</h2>
+            <AnimatedHeading as="h2" className="mt-3 text-2xl font-bold tracking-tight text-white">The right team for the right kind of work.</AnimatedHeading>
             <p className="mt-3 text-sm leading-6 text-slate-400">Admins route each request by its service track, the skills it needs and who is available.</p>
           </div>
           <div className="mt-8 grid gap-4 lg:grid-cols-3">
@@ -106,7 +107,7 @@ export default function WorkflowPage() {
         <div className="flex flex-col items-start justify-between gap-6 rounded-[2rem] border border-cyan-300/20 bg-gradient-to-br from-cyan-400/10 to-indigo-500/10 p-6 sm:flex-row sm:items-center sm:p-8">
           <div>
             <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.18em] text-cyan-300"><Sparkles className="size-3.5" /> Ready when you are</p>
-            <h2 className="mt-3 text-2xl font-bold tracking-tight text-white">Get a custom GHS quote. No deposit.</h2>
+            <AnimatedHeading as="h2" className="mt-3 text-2xl font-bold tracking-tight text-white">Get a custom GHS quote. No deposit.</AnimatedHeading>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <a href="/#intake" className="flex items-center justify-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 hover:bg-cyan-200">

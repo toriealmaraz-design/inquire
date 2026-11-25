@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useState } from 'react'
 import { Check, EyeOff, Star, Trash2 } from 'lucide-react'
@@ -41,7 +42,7 @@ export function FeedbackManager() {
 
   return (
     <div className="mt-8">
-      <h2 className="text-lg font-bold">Customer feedback</h2>
+      <AnimatedHeading as="h2" className="text-lg font-bold">Customer feedback</AnimatedHeading>
       <p className="mt-1 text-xs text-slate-500">Approve feedback to publish it on the public Feedback page. Pending items are not shown to visitors.</p>
       {error && <p className="mt-3 text-xs text-rose-300">{error}</p>}
       {loading ? (

@@ -1,3 +1,4 @@
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { redirect } from 'next/navigation'
 import { ArrowLeft } from 'lucide-react'
 import { getPageUser, isAdmin, needsOnboarding } from '@/lib/auth'
@@ -24,7 +25,7 @@ export default async function ComplaintsPage() {
           <a href={admin ? '/dashboard' : '/agent/dashboard'} className="flex items-center gap-2 text-xs text-slate-400 hover:text-white"><ArrowLeft className="size-4" /> Back to dashboard</a>
           <NotificationBell />
         </div>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Complaints</h1>
+        <AnimatedHeading as="h1" className="text-2xl font-bold tracking-tight sm:text-3xl">Complaints</AnimatedHeading>
         {admin && user.role !== 'super_admin' && <ContactSuperAdmin />}
         <ComplaintForm />
       </div>

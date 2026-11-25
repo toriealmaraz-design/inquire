@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { Send, ArrowLeft, Paperclip, CheckCheck, Check, FileText, Download, Loader2, AlertCircle, X, Pencil, Mic, Square, Search, ChevronDown, MoreVertical, CornerUpLeft, Trash2 } from 'lucide-react'
@@ -541,7 +542,7 @@ export default function ChatPage() {
             <span className={`absolute bottom-0 right-0 size-3 rounded-full border-2 border-[#0a1929] ${online ? 'bg-emerald-400' : 'bg-slate-500'}`} />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="truncate text-sm font-semibold">Gemini Nexus Support</h1>
+            <AnimatedHeading as="h1" className="truncate text-sm font-semibold">Gemini Nexus Support</AnimatedHeading>
             <p className={`truncate text-xs ${peerTyping ? 'text-cyan-300' : online ? 'text-emerald-400' : 'text-slate-400'}`} aria-live="polite">{statusText}</p>
           </div>
           <button onClick={() => { setShowSearch((v) => !v); setSearch('') }} aria-label="Search messages" className="rounded-full p-2 text-slate-400 hover:bg-white/5 hover:text-cyan-300"><Search className="size-4" /></button>
@@ -609,7 +610,7 @@ export default function ChatPage() {
           {messages.length === 0 && (
             <div className="mx-auto mt-6 max-w-md text-center">
               <div className="mx-auto flex size-14 items-center justify-center overflow-hidden rounded-2xl"><BrandLogo width={56} height={56} className="size-14 rounded-2xl object-cover" /></div>
-              <h2 className="mt-4 text-lg font-semibold">Chat with our team</h2>
+              <AnimatedHeading as="h2" className="mt-4 text-lg font-semibold">Chat with our team</AnimatedHeading>
               <p className="mt-2 text-sm leading-6 text-slate-400">
                 Tell us what you need. Attach your brief, slides or files with the clip. Replies appear here, so you can come back to this page any time on this device.
               </p>

@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useMemo, useState } from 'react'
 import { ArrowLeft, BookOpen, Search, ShieldCheck } from 'lucide-react'
@@ -54,7 +55,7 @@ export function HelpClient({ role, status, name }: { role: string | null; status
 
           {!q && (
             <div className={`${glass} rounded-3xl p-5 sm:p-6`}>
-              <h2 className="font-bold">What your role can do</h2>
+              <AnimatedHeading as="h2" className="font-bold">What your role can do</AnimatedHeading>
               <ul className="mt-4 grid gap-2 sm:grid-cols-2">
                 {CAN.map((c) => {
                   const ok = RANK[c.min] <= RANK[level]
@@ -73,10 +74,10 @@ export function HelpClient({ role, status, name }: { role: string | null; status
 
           {groups.map((g) => (
             <section key={g.title} aria-label={g.title} className="flex flex-col gap-4">
-              <h2 className="mt-2 text-xs font-bold uppercase tracking-[.18em] text-slate-400">{g.title}</h2>
+              <AnimatedHeading as="h2" className="mt-2 text-xs font-bold uppercase tracking-[.18em] text-slate-400">{g.title}</AnimatedHeading>
               {g.sections.map((s) => (
                 <article key={s.id} id={s.id} className={`${glass} scroll-mt-6 rounded-3xl p-5 sm:p-6`}>
-                  <h3 className="text-lg font-semibold">{s.title}</h3>
+                  <AnimatedHeading as="h3" className="text-lg font-semibold">{s.title}</AnimatedHeading>
                   {s.body && <p className="mt-2 text-sm leading-6 text-slate-300">{s.body}</p>}
                   {s.steps && (
                     <ol className="mt-3 space-y-2">

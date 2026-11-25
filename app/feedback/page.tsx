@@ -1,4 +1,5 @@
 'use client'
+import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Quote, Send, Star } from 'lucide-react'
@@ -79,7 +80,7 @@ export default function FeedbackPage() {
       </header>
 
       <section className="relative z-10 mx-auto max-w-5xl px-5 py-14 lg:px-8">
-        <h1 className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">What our clients say</h1>
+        <AnimatedHeading as="h1" className="text-4xl font-bold tracking-[-.04em] text-white sm:text-5xl">What our clients say</AnimatedHeading>
         <p className="mt-4 max-w-2xl text-base leading-7 text-slate-400">Real feedback from people we&rsquo;ve worked with — and a space for you to share yours.</p>
 
         <div className="mt-10 grid gap-8 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -105,7 +106,7 @@ export default function FeedbackPage() {
 
           {/* Submit form */}
           <form onSubmit={submit} className="h-fit rounded-3xl border border-white/15 bg-white/[0.06] p-6 shadow-2xl shadow-black/20 backdrop-blur-2xl lg:sticky lg:top-24">
-            <h2 className="text-lg font-bold text-white">Leave feedback</h2>
+            <AnimatedHeading as="h2" className="text-lg font-bold text-white">Leave feedback</AnimatedHeading>
             <p className="mt-1 text-xs text-slate-500">Submissions are reviewed before they appear publicly.</p>
             <div className="mt-5 space-y-3">
               <input value={name} onChange={(e) => setName(e.target.value)} maxLength={120} required placeholder="Your name" className={field} />
