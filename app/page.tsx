@@ -312,9 +312,9 @@ function ClientPortal(props: PortalProps) {
         <video className="pointer-events-none absolute inset-0 -z-10 h-full w-full object-cover opacity-25" src="/assets/material-hills.mp4" autoPlay muted loop playsInline preload="none" aria-hidden="true" />
         <div className="hero-glow max-w-3xl">
           <span className="inline-flex items-center gap-2 rounded-full border border-cyan-300/25 bg-cyan-300/10 px-3 py-1.5 text-xs font-bold text-cyan-200"><Sparkles className="size-3.5" /> Ghana operational · custom GHS quotes</span>
-          <h1 className="mt-6 text-5xl font-bold leading-[.98] tracking-[-.06em] text-white sm:text-7xl">
-            <AnimatedHeading as="span" className="hero-line" style={{ justifyContent: 'flex-start' }}>Serious work.</AnimatedHeading>
-            <AnimatedHeading as="span" className="hero-line hero-title-accent" style={{ justifyContent: 'flex-start' }}>Right specialist.</AnimatedHeading>
+          <h1 className="mt-6 text-[clamp(2rem,9vw,4.5rem)] font-bold leading-[.98] tracking-[-.06em] text-white">
+            <AnimatedHeading as="span" className="hero-line" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}>Serious work.</AnimatedHeading>
+            <AnimatedHeading as="span" className="hero-line hero-title-accent" style={{ justifyContent: 'flex-start', flexWrap: 'nowrap' }}>Right specialist.</AnimatedHeading>
           </h1>
           <p className="mt-7 max-w-2xl text-base leading-7 text-slate-400">One secure intake line for research coaching, visual media, and technical consulting. Work with a specialist to solve problems, strengthen your skills, and improve your own deliverables.</p>
           <div className="mt-8 flex flex-wrap gap-3">
