@@ -57,6 +57,7 @@ export function IntakeShell({
         <p className="mt-8 text-xs font-bold uppercase tracking-[.18em] text-cyan-300">Request intake · Step {current} of 3</p>
         <AnimatedHeading as="h1" style={{ justifyContent: 'flex-start' }} className="mt-2 text-3xl font-bold tracking-tight text-white sm:text-4xl">{title}</AnimatedHeading>
         <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{subtitle}</p>
+        <p className="mt-2 text-[10px] text-slate-500">Draft stays in this tab; returning-client details stay on this device only.</p>
         <div className="portal-glass mt-8 rounded-[2rem] p-5 sm:p-8">{children}</div>
       </main>
 

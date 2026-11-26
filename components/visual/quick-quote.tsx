@@ -4,29 +4,18 @@ import { useMemo, useState } from 'react'
 import { ArrowRight, Clock3, Sparkles } from 'lucide-react'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { previewText } from '@/lib/text'
-import { deadlineFor, deadlineOptions } from '@/components/intake/pricing'
+import { deadlineFor, deadlineOptions, quoteFor } from '@/components/intake/pricing'
+import { quickScopePresets } from '@/components/intake/quick-scope'
 
-type Track = 'academic' | 'media' | 'systems'
-
-const options: { id: string; label: string; track: Track; unit: string; low: number; high: number }[] = [
-  { id: 'proofreading', label: 'Proofreading & formatting', track: 'academic', unit: 'pages', low: 8, high: 14 },
-  { id: 'slides', label: 'Slide deck design', track: 'media', unit: 'slides', low: 12, high: 20 },
-  { id: 'debugging', label: 'Code debugging review', track: 'systems', unit: 'hours', low: 35, high: 55 },
-]
-
-/** Landing-page teaser for the same GHS estimate used inside the intake flow. */
+/** Landing-page teaser for the same four quick scopes and GHS estimate used inside intake. */
 export function QuickQuote() {
-  const [optionId, setOptionId] = useState(options[0].id)
-  const [volume, setVolume] = useState(6)
-  const [urgency, setUrgency] = useState('Standard')
+  const [optionId, setOptionId] = useState(quickScopePresets[0].id)
+  const [volume, setVolume] = useState(quickScopePresets[0].volume)
+  const [urgency, setUrgency] = useState(quickScopePresets[0].urgency)
 
-  const option = options.find((item) => item.id === optionId) ?? options[0]
+  const option = quickScopePresets.find((item) => item.id === optionId) ?? quickScopePresets[0]
   const deadline = deadlineFor(urgency)
-  const multiplier = deadline.multiplier
-  const estimate = useMemo(() => ({
-    low: Math.round(option.low * volume * multiplier),
-    high: Math.round(option.high * volume * multiplier),
-  }), [option, volume, multiplier])
+  const estimate = useMemo(() => quoteFor({ ...option, volume, urgency }), [option, volume, urgency])
 
   return (
     <section id="quick-estimate" aria-labelledby="quick-quote-title" className="mx-auto max-w-7xl scroll-mt-24 px-5 pb-16 lg:px-8">
@@ -45,15 +34,21 @@ export function QuickQuote() {
 
           <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[.04] p-5 sm:p-6">
             <label htmlFor="quick-category" className="text-xs font-semibold text-slate-300">What do you need?</label>
-            <select id="quick-category" value={optionId} onChange={(event) => setOptionId(event.target.value)} className="portal-input mt-2 h-11 w-full px-3 text-sm">
-              {options.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
+            <select id="quick-category" value={optionId} onChange={(event) => {
+              const next = quickScopePresets.find((item) => item.id === event.target.value)
+              if (!next) return
+              setOptionId(next.id)
+              setVolume(next.volume)
+              setUrgency(next.urgency)
+            }} className="portal-input mt-2 h-11 w-full px-3 text-sm">
+              {quickScopePresets.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}
             </select>
 
             <div className="mt-5 flex items-center justify-between">
               <label htmlFor="quick-volume" className="text-xs font-semibold text-slate-300">Volume</label>
-              <span className="text-xs font-bold text-cyan-200">{volume} {option.unit}</span>
+              <span className="text-xs font-bold text-cyan-200">{volume} {estimate.unit}</span>
             </div>
-            <input id="quick-volume" type="range" min={1} max={20} value={volume} onChange={(event) => setVolume(Number(event.target.value))} aria-label={`Volume in ${option.unit}`} className="mt-3 h-2 w-full accent-cyan-300" />
+            <input id="quick-volume" type="range" min={1} max={20} value={volume} onChange={(event) => setVolume(Number(event.target.value))} aria-label={`Volume in ${estimate.unit}`} className="mt-3 h-2 w-full accent-cyan-300" />
 
             <fieldset className="mt-5">
               <legend className="flex items-center gap-1.5 text-xs font-semibold text-slate-300"><Clock3 className="size-3.5" /> Deadline / turnaround</legend>
@@ -72,9 +67,9 @@ export function QuickQuote() {
               <div>
                 <p className="text-[11px] text-slate-500">Indicative range</p>
                 <p className="mt-1 text-3xl font-bold tracking-tight text-white">GHS {estimate.low}–{estimate.high}</p>
-                <p className="mt-1 text-[11px] text-slate-500">{previewText(option.label, 40)} · {volume} {option.unit}</p>
+                <p className="mt-1 text-[11px] text-slate-500">{previewText(option.label, 40)} · {volume} {estimate.unit}</p>
               </div>
-              <a href={`/intake?track=${option.track}`} className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">
+              <a href={`/intake?track=${estimate.track}&cat=${option.cat}`} className="portal-focus inline-flex items-center gap-2 rounded-xl bg-cyan-300 px-5 py-3 text-sm font-bold text-slate-950 transition hover:bg-cyan-200">
                 Start this brief <ArrowRight className="size-4" />
               </a>
             </div>

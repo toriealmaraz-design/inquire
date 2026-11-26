@@ -9,7 +9,17 @@ import { TicketTimeline } from '@/components/ticket-timeline'
 import { PostDeliveryRating } from '@/components/track/post-delivery-rating'
 
 type Result =
-  | { found: true; ticketId: string; serviceType: string; title: string; status: string; createdAt: string }
+  | {
+      found: true
+      ticketId: string
+      serviceType: string
+      title: string
+      status: string
+      createdAt: string
+      revisionCount?: number
+      clientSignoffAt?: string | null
+      commissionStatus?: 'PENDING' | 'AVAILABLE'
+    }
   | { found: false; ticketId: string }
 
 export default function TrackPage() {
@@ -95,7 +105,15 @@ export default function TrackPage() {
               <span className="shrink-0 rounded-full bg-emerald-400/15 px-3 py-1 text-xs font-bold text-emerald-200">{result.status}</span>
             </div>
 
-            <TicketTimeline status={result.status} createdAt={result.createdAt} ticketId={result.ticketId} />
+            <TicketTimeline
+              key={result.ticketId}
+              status={result.status}
+              createdAt={result.createdAt}
+              ticketId={result.ticketId}
+              revisionCount={result.revisionCount}
+              clientSignoffAt={result.clientSignoffAt}
+              commissionStatus={result.commissionStatus}
+            />
 
             {/delivered|complete|paid/i.test(result.status) && <PostDeliveryRating ticketId={result.ticketId} />}
 

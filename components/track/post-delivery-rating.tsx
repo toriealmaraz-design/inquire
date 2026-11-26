@@ -76,7 +76,7 @@ export function PostDeliveryRating({ ticketId }: { ticketId: string }) {
         <input value={review} onChange={(e) => setReview(e.target.value)} maxLength={180} placeholder="One sentence about your experience (optional)" aria-label="One sentence about your experience (optional)" className={field} />
       </div>
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <span className="text-[10px] text-slate-600">Reviews are published after a quick check.</span>
+        <span className="text-[10px] text-slate-600">Optional, and separate from delivery sign-off. Reviews are published after a quick check.</span>
         <button type="submit" disabled={busy} className="flex items-center gap-1.5 rounded-xl bg-cyan-300 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-cyan-200 disabled:opacity-50">
           {busy ? 'Sending…' : <><Send className="size-3.5" /> Send rating</>}
         </button>

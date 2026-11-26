@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
-import { and, desc, eq, inArray, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
 import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin, isLead } from '@/lib/auth'
 import { briefTitle, fieldLabel } from '@/lib/fields'
+import { netMargin, subAgentOverride } from '@/lib/commission'
 import { sendPush } from '@/lib/push'
 
 export const runtime = 'nodejs'
@@ -15,6 +16,42 @@ function clean(value: unknown, maxLength: number) {
 
 const referrer = alias(users, 'referrer')
 const assignee = alias(users, 'assignee')
+
+const isDelivered = (status: string | null) => /delivered|complete|paid/i.test(status || '')
+
+// A valid chain is exactly two levels: referrer -> upline, with no parent above
+// the upline. Never infer an override from an unlinked or over-deep account.
+async function resolveUpline(referredBy: number | null) {
+  if (!referredBy) return null
+  const [referring] = await db
+    .select({ parentAgentId: users.parentAgentId })
+    .from(users)
+    .where(eq(users.id, referredBy))
+    .limit(1)
+  if (!referring?.parentAgentId) return null
+  const [parent] = await db
+    .select({ id: users.id, parentAgentId: users.parentAgentId })
+    .from(users)
+    .where(eq(users.id, referring.parentAgentId))
+    .limit(1)
+  return parent && !parent.parentAgentId ? parent.id : null
+}
+
+// The specialist's pay and the referring agent's commission are subtracted
+// BEFORE the 15% override, so the override can only ever come from platform margin.
+async function overrideFor(row: {
+  referredBy: number | null
+  assignedTo: number | null
+  priceGhs: string | null
+  commissionGhs: string | null
+  referralCommissionGhs: string | null
+}) {
+  const uplineAgentId = await resolveUpline(row.referredBy)
+  if (!uplineAgentId) return null
+  const direct = row.referredBy && row.referredBy !== row.assignedTo ? Number(row.referralCommissionGhs || 0) : 0
+  const override = subAgentOverride(netMargin(row.priceGhs, row.commissionGhs, direct))
+  return { uplineAgentId, overrideGhs: override.toFixed(2) }
+}
 
 // Admins: all intake briefs, with who referred them
 export async function GET() {
@@ -42,7 +79,12 @@ export async function GET() {
         assigneeName: assignee.name,
         priceGhs: submissions.priceGhs,
         commissionGhs: submissions.commissionGhs,
+        referralCommissionGhs: submissions.referralCommissionGhs,
         paidAt: submissions.paidAt,
+        revisionCount: submissions.revisionCount,
+        clientSignoffAt: submissions.clientSignoffAt,
+        commissionStatus: submissions.commissionStatus,
+        overrideGhs: submissions.overrideGhs,
         createdAt: submissions.createdAt,
       })
       .from(submissions)
@@ -73,14 +115,23 @@ export async function POST(request: Request) {
   try {
     // Attribute to an agent if the client arrived through a referral link
     let referredBy: number | null = null
+    let uplineAgentId: number | null = null
     const ref = clean(body.ref, 20).toUpperCase()
     if (ref) {
       const [agent] = await db
-        .select({ id: users.id })
+        .select({ id: users.id, parentAgentId: users.parentAgentId })
         .from(users)
         .where(and(eq(users.referralCode, ref), eq(users.status, 'active')))
         .limit(1)
       referredBy = agent?.id ?? null
+      if (agent?.parentAgentId) {
+        const [parent] = await db
+          .select({ id: users.id, parentAgentId: users.parentAgentId })
+          .from(users)
+          .where(eq(users.id, agent.parentAgentId))
+          .limit(1)
+        if (parent && !parent.parentAgentId) uplineAgentId = parent.id
+      }
     }
 
     // Track-based ticket number from the database, e.g. AC-2610-007 (matches TICKET_RE / tracker)
@@ -99,6 +150,7 @@ export async function POST(request: Request) {
         briefDetails: clean(body.briefDetails, 1600),
         fileUrls: clean(body.fileUrls, 1000),
         referredBy,
+        uplineAgentId,
       })
       .returning({ id: submissions.id, ticketId: submissions.ticketId })
     if (!created) throw new Error('Insert failed')
@@ -178,9 +230,62 @@ export async function PATCH(request: Request) {
           else if (existing.referredBy) set.referralCommissionGhs = null
         } else return NextResponse.json({ error: 'Invalid price.' }, { status: 400 })
       }
-      if (f.unpay === true) set.paidAt = null
+      if (f.unpay === true) {
+        set.paidAt = null
+        set.commissionStatus = 'PENDING'
+        set.clientSignoffAt = null
+        set.overrideGhs = null
+      }
+      // A delivered/paid brief can also be priced after it moves through tracking.
+      // Recompute only before clearance, so an AVAILABLE ledger row stays stable.
+      if (f.unpay !== true && existing.commissionStatus !== 'AVAILABLE' && isDelivered(text('status', 30) || existing.status)) {
+        const asString = (v: unknown, fallback: string | null) => (typeof v === 'string' ? v : fallback)
+        const override = await overrideFor({
+          referredBy: existing.referredBy,
+          assignedTo: existing.assignedTo,
+          priceGhs: asString(set.priceGhs, existing.priceGhs),
+          commissionGhs: asString(set.commissionGhs, existing.commissionGhs),
+          referralCommissionGhs: asString(set.referralCommissionGhs, existing.referralCommissionGhs),
+        })
+        if (override) Object.assign(set, override)
+      }
       if (!Object.keys(set).length) return NextResponse.json({ error: 'Nothing to change.' }, { status: 400 })
       const [updated] = await db.update(submissions).set(set).where(eq(submissions.id, id)).returning()
+      return NextResponse.json(updated)
+    }
+
+    // Client-visible revision counter: max 2, guarded in SQL against races.
+    if (body?.action === 'revision') {
+      if (existing.clientSignoffAt) return NextResponse.json({ error: 'The client has already signed off.' }, { status: 409 })
+      if (existing.revisionCount >= 2) return NextResponse.json({ error: 'The two-revision limit has been reached.' }, { status: 409 })
+      const [updated] = await db
+        .update(submissions)
+        .set({ revisionCount: sql`least(2, ${submissions.revisionCount} + 1)` })
+        .where(and(eq(submissions.id, id), sql`${submissions.revisionCount} < 2`, isNull(submissions.clientSignoffAt)))
+        .returning()
+      if (!updated) return NextResponse.json({ error: 'The two-revision limit has been reached.' }, { status: 409 })
+      return NextResponse.json(updated)
+    }
+
+    // Explicit client acceptance is what releases PENDING commissions/overrides.
+    if (body?.action === 'clientSignoff') {
+      if (!existing.paidAt) return NextResponse.json({ error: 'Mark the job paid before sign-off.' }, { status: 400 })
+      if (!isDelivered(existing.status)) return NextResponse.json({ error: 'Deliver the job before sign-off.' }, { status: 400 })
+      if (existing.commissionStatus === 'AVAILABLE') return NextResponse.json(existing)
+      const set: Partial<typeof submissions.$inferInsert> = {
+        commissionStatus: 'AVAILABLE',
+        clientSignoffAt: new Date(),
+      }
+      if (existing.uplineAgentId && !existing.overrideGhs) {
+        const override = await overrideFor(existing)
+        if (override) Object.assign(set, override)
+      }
+      const [updated] = await db
+        .update(submissions)
+        .set(set)
+        .where(and(eq(submissions.id, id), eq(submissions.commissionStatus, 'PENDING'), isNotNull(submissions.paidAt)))
+        .returning()
+      if (!updated) return NextResponse.json({ error: 'Commission is not pending clearance.' }, { status: 409 })
       return NextResponse.json(updated)
     }
 
@@ -233,9 +338,18 @@ export async function PATCH(request: Request) {
       if (!existing.assignedTo || !existing.priceGhs) {
         return NextResponse.json({ error: 'Assign the job to an agent with a price first.' }, { status: 400 })
       }
+      // Marking paid only clears the ledger for release; client sign-off makes
+      // commission + any margin-funded override AVAILABLE for the MoMo batch.
+      const override = await overrideFor(existing)
       const [updated] = await db
         .update(submissions)
-        .set({ status: 'Paid', paidAt: new Date() })
+        .set({
+          status: 'Paid',
+          paidAt: new Date(),
+          commissionStatus: 'PENDING',
+          uplineAgentId: override?.uplineAgentId ?? null,
+          overrideGhs: override?.overrideGhs ?? null,
+        })
         .where(eq(submissions.id, id))
         .returning()
 

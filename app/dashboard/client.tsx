@@ -20,6 +20,8 @@ import { downloadBriefPacket } from '@/components/admin/brief-packet'
 import { FlaggedContacts, type Flag } from '@/components/admin/flagged-contacts'
 import { MarginSimulator } from '@/components/admin/margin-simulator'
 import { WeeklySnapshot } from '@/components/admin/weekly-snapshot'
+import { MomoBatch } from '@/components/admin/momo-batch'
+import { extractDeadline, formatDeadline } from '@/components/admin/deadline'
 import { contactKey } from '@/lib/phone'
 import { BriefEditor } from '@/components/brief-editor'
 import { ComplaintsInbox } from '@/components/complaints'
@@ -111,6 +113,10 @@ type IntakeRow = {
   priceGhs: string | null
   commissionGhs: string | null
   paidAt: string | null
+  revisionCount?: number | null
+  clientSignoffAt?: string | null
+  commissionStatus?: string | null
+  overrideGhs?: string | null
   deadline?: string | null
   dueAt?: string | null
 }
@@ -162,6 +168,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [openProfile, setOpenProfile] = useState<number | null>(null)
   const [editing, setEditing] = useState<number | null>(null)
   const [subFilter, setSubFilter] = useState<'all' | 'open' | 'assigned' | 'paid'>('all')
+  const [deadlineSort, setDeadlineSort] = useState(false)
   const [typeFilter, setTypeFilter] = useState<'all' | 'academic' | 'media' | 'systems'>('all')
   const [payError, setPayError] = useState<Record<number, string>>({})
   const [unread, setUnread] = useState(0)
@@ -373,23 +380,40 @@ export function DashboardClient({ user }: { user: User }) {
     }
     return [...map.values()].sort((a, b) => b.last - a.last)
   })()
-  const visibleFolders = folders
-    .map((f) => ({
-      ...f,
-      briefs: f.briefs.filter((s) =>
-        (subFilter === 'open' ? !s.assignedTo && !s.paidAt : subFilter === 'assigned' ? !!s.assignedTo && !s.paidAt : subFilter === 'paid' ? !!s.paidAt : true)
-        && (typeFilter === 'all' || s.category === typeFilter)
-      ),
-    }))
-    .filter((f) => (subFilter === 'all' && typeFilter === 'all') || f.briefs.length > 0)
-    .filter((f) => {
-      const q = subSearch.trim().toLowerCase()
-      if (!q) return true
-      return [f.name, f.contact, ...f.briefs.map((s) => `${s.ticketId} ${briefTitle(s)} ${s.serviceType} ${s.briefDetails || ''}`), ...f.files.map((x) => x.file_name)]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
-    })
+  const visibleFolders = (() => {
+    const list = folders
+      .map((f) => ({
+        ...f,
+        briefs: f.briefs.filter((s) =>
+          (subFilter === 'open' ? !s.assignedTo && !s.paidAt : subFilter === 'assigned' ? !!s.assignedTo && !s.paidAt : subFilter === 'paid' ? !!s.paidAt : true)
+          && (typeFilter === 'all' || s.category === typeFilter)
+        ),
+      }))
+      .filter((f) => (subFilter === 'all' && typeFilter === 'all') || f.briefs.length > 0)
+      .filter((f) => {
+        const q = subSearch.trim().toLowerCase()
+        if (!q) return true
+        return [f.name, f.contact, ...f.briefs.map((s) => `${s.ticketId} ${briefTitle(s)} ${s.serviceType} ${s.briefDetails || ''}`), ...f.files.map((x) => x.file_name)]
+          .join(' ')
+          .toLowerCase()
+          .includes(q)
+      })
+    if (!deadlineSort) return list
+    // Client-only sort from the shared deadline helper: soonest open job first.
+    // No timer or polling — it recalculates on the next ordinary render.
+    const now = Date.now()
+    const hoursLeft = (s: IntakeRow) => {
+      const ts = extractDeadline(s)
+      return ts === null ? null : (ts - now) / 3_600_000
+    }
+    const nearest = (f: ClientFolder) => {
+      const hours = f.briefs.filter((s) => !s.paidAt).map(hoursLeft).filter((h): h is number => h !== null)
+      return hours.length ? Math.min(...hours) : null
+    }
+    return list
+      .map((f) => ({ ...f, briefs: [...f.briefs].sort((a, b) => (hoursLeft(a) ?? Infinity) - (hoursLeft(b) ?? Infinity)) }))
+      .sort((a, b) => (nearest(a) ?? Infinity) - (nearest(b) ?? Infinity))
+  })()
 
   const pendingCount = users.filter(u => u.status === 'pending').length
   const activeCount = users.filter(u => u.status === 'active').length
@@ -539,6 +563,7 @@ export function DashboardClient({ user }: { user: User }) {
                   <MarginSimulator commissionPercent={commissionPercent} />
                 </div>
               )}
+              {(isSuperAdmin || isSubAdmin) && <div className="mt-5"><MomoBatch /></div>}
               <AnalyticsBoard onNavigate={(t) => nav.includes(t) && setTab(t)} />
             </>
           )}
@@ -603,6 +628,14 @@ export function DashboardClient({ user }: { user: User }) {
                         </button>
                       ))}
                     </div>
+                    <button
+                      onClick={() => setDeadlineSort((v) => !v)}
+                      aria-pressed={deadlineSort}
+                      title="Sort open folders and briefs by remaining hours"
+                      className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition ${deadlineSort ? 'bg-cyan-500 text-white' : 'bg-white/5 text-slate-400 hover:text-white'}`}
+                    >
+                      {deadlineSort && <Check className="size-3" />} Deadline sort
+                    </button>
                   </div>
                 </div>
                 {isSuperAdmin && <FlaggedContacts flags={flagged} onUpdate={setFlagged} />}
@@ -683,6 +716,13 @@ export function DashboardClient({ user }: { user: User }) {
                           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                             <span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}
                             <AgingBadge brief={s} />
+                            {deadlineSort && !s.paidAt && (() => {
+                              const ts = extractDeadline(s)
+                              if (ts === null) return null
+                              const hours = Math.ceil((ts - Date.now()) / 3_600_000)
+                              const tone = hours < 3 ? 'bg-rose-400/15 text-rose-200' : hours < 12 ? 'bg-amber-300/15 text-amber-200' : 'bg-emerald-300/15 text-emerald-200'
+                              return <span title={formatDeadline(ts)} className={`rounded-full px-2 py-0.5 text-[10px] ${tone}`}>{hours < 0 ? 'overdue' : `${hours}h left`}</span>
+                            })()}
                           </p>
                         </div>
                         <span className="flex items-center gap-2">
@@ -716,8 +756,26 @@ export function DashboardClient({ user }: { user: User }) {
                           {s.referrerName ? <>Referred by <strong className="text-cyan-200">{s.referrerName}</strong></> : 'No referral'}
                         </span>
                         {s.paidAt ? (
-                          <span className="ml-auto text-emerald-300">
-                            Paid · {s.assigneeName || 'Agent'} · GHS {Number(s.priceGhs).toFixed(2)} · commission GHS {Number(s.commissionGhs || 0).toFixed(2)}
+                          <span className="ml-auto flex flex-wrap items-center gap-2">
+                            <span className="text-emerald-300">
+                              Paid · {s.assigneeName || 'Agent'} · GHS {Number(s.priceGhs).toFixed(2)} · commission GHS {Number(s.commissionGhs || 0).toFixed(2)}
+                              {Number(s.overrideGhs || 0) > 0 && <> · override GHS {Number(s.overrideGhs).toFixed(2)}</>}
+                            </span>
+                            {s.commissionStatus === 'AVAILABLE' ? (
+                              <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">Available for MoMo</span>
+                            ) : (
+                              <button
+                                onClick={() => window.confirm(`Confirm the client signed off on ${s.ticketId}? This releases commission for payout.`) && updateBrief(s.id, { action: 'clientSignoff' })}
+                                disabled={payingId === s.id}
+                                className="h-8 rounded-lg border border-emerald-300/30 px-2 text-[11px] font-bold text-emerald-200 hover:bg-emerald-400/10 disabled:opacity-50"
+                              >Client signed off</button>
+                            )}
+                            <button
+                              onClick={() => updateBrief(s.id, { action: 'revision' })}
+                              disabled={payingId === s.id || (s.revisionCount ?? 0) >= 2 || !!s.clientSignoffAt}
+                              title="Increment the client revision count (max 2)"
+                              className="h-8 rounded-lg border border-white/10 px-2 text-[11px] text-slate-300 hover:border-cyan-300/40 disabled:opacity-50"
+                            >Revision {s.revisionCount ?? 0}/2</button>
                           </span>
                         ) : (
                           <span className="ml-auto flex flex-wrap items-center gap-2">

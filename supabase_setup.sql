@@ -17,6 +17,7 @@ create table if not exists public.users (
   status varchar(20) not null default 'active',
   field varchar(30),
   referral_code varchar(20) unique,
+  parent_agent_id integer references public.users(id) on delete set null,
   profile jsonb,
   onboarded_at timestamp,
   signup_notified boolean not null default false,
@@ -101,6 +102,11 @@ create table if not exists public.submissions (
   price_ghs numeric(10,2),
   commission_ghs numeric(10,2),
   referral_commission_ghs numeric(10,2),
+  upline_agent_id integer references public.users(id) on delete set null,
+  revision_count integer not null default 0,
+  client_signoff_at timestamp,
+  commission_status varchar(20) not null default 'PENDING',
+  override_ghs numeric(10,2),
   assigned_at timestamp,
   paid_at timestamp,
   created_at timestamp default now()
@@ -177,6 +183,40 @@ create table if not exists public.complaints (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- ---------------------------------------------------------------------------
+-- 1b. Refined sub-agent network + margin-safe override ledger (idempotent).
+--     Existing projects get the new columns; fresh projects already have them
+--     from the create statements above. Constraints are added only once.
+-- ---------------------------------------------------------------------------
+alter table public.users add column if not exists parent_agent_id integer;
+alter table public.submissions add column if not exists upline_agent_id integer;
+alter table public.submissions add column if not exists revision_count integer not null default 0;
+alter table public.submissions add column if not exists client_signoff_at timestamp;
+alter table public.submissions add column if not exists commission_status varchar(20) not null default 'PENDING';
+alter table public.submissions add column if not exists override_ghs numeric(10,2);
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'users_parent_agent_id_fkey' and conrelid = 'public.users'::regclass) then
+    alter table public.users add constraint users_parent_agent_id_fkey
+      foreign key (parent_agent_id) references public.users(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'submissions_upline_agent_id_fkey' and conrelid = 'public.submissions'::regclass) then
+    alter table public.submissions add constraint submissions_upline_agent_id_fkey
+      foreign key (upline_agent_id) references public.users(id) on delete set null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'submissions_revision_count_range' and conrelid = 'public.submissions'::regclass) then
+    alter table public.submissions add constraint submissions_revision_count_range
+      check (revision_count >= 0 and revision_count <= 2);
+  end if;
+end $$;
+
+create index if not exists users_parent_agent_id_idx on public.users (parent_agent_id);
+create index if not exists submissions_referred_by_idx on public.submissions (referred_by);
+create index if not exists submissions_assigned_to_idx on public.submissions (assigned_to);
+create index if not exists submissions_upline_agent_id_idx on public.submissions (upline_agent_id);
+create index if not exists submissions_commission_status_idx on public.submissions (commission_status);
 
 create table if not exists public.testimonials (
   id serial primary key,

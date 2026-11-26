@@ -4,6 +4,8 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight, BookOpen, Check, Code2, FileText } from 'lucide-react'
 import { IntakeShell } from '@/components/intake/intake-shell'
 import { ProofSamples } from '@/components/intake/proof-samples'
+import { QuickScopePresets } from '@/components/intake/quick-scope-presets'
+import { activeQuickScope } from '@/components/intake/quick-scope'
 import { QuoteEstimator } from '@/components/quote-estimator'
 import { useIntake, type Track } from './provider'
 
@@ -15,11 +17,13 @@ const tracks = [
 
 export default function IntakeScopePage() {
   const router = useRouter()
-  const { track, setTrack, quote, urgency, setUrgency, updateQuote } = useIntake()
+  const { track, setTrack, quote, urgency, setUrgency, updateQuote, applyQuickScope } = useIntake()
 
   return (
-    <IntakeShell current={1} title="Track & scope" subtitle="Pick the service track and shape an instant GHS estimate. You can change everything before you submit.">
-      <p className="text-sm font-semibold text-slate-200">Choose a service track</p>
+    <IntakeShell current={1} title="Track & scope" subtitle="Pick a quick scope or choose your track, then shape an instant GHS estimate. You can change everything before you submit.">
+      <QuickScopePresets activeId={activeQuickScope(quote)} onSelect={applyQuickScope} />
+
+      <p className="mt-8 text-sm font-semibold text-slate-200">Choose a service track</p>
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         {tracks.map((item) => {
           const Icon = item.icon

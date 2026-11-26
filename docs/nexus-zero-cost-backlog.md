@@ -38,7 +38,15 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 
 ## Implementation status (26 Nov 2026)
 
-- **Shipped:** 1–9, 11–15, 17–18, 20.
-- **Shipped but needs `supabase_setup.sql` re-run:** 16 (`flagged_contacts` table). The API returns an empty list with a warning until the table exists.
-- **Pending:** 10 (two-tier sub-agent override needs new DB columns/tables), 19 (presigned 900s URLs need an R2/private-bucket migration; current app uses public Supabase Storage).
+- **Shipped:** 1–15, 17–18, 20 (10 now implemented in code).
+- **Shipped but needs `supabase_setup.sql` re-run:** 16 (`flagged_contacts` table) and 10 (`parent_agent_id`, `upline_agent_id`, `revision_count`, `client_signoff_at`, `commission_status`, `override_ghs` plus indexes). APIs degrade safely until the schema exists.
+- **Pending:** 19 (presigned 900s URLs need an R2/private-bucket migration; current app uses public Supabase Storage).
 - **Added dependency:** `qrcode` for real scannable referral posters.
+
+## Refined scope (26 Nov 2026, second pass)
+
+- **Sub-agent network:** `?upline=CODE` invite links, self-referential `parent_agent_id`, depth cap 2, anti-loop checks, anonymized roster, `15%` of platform net margin as override (never from specialist/direct-agent cuts), released only after `DELIVERED` + paid + client sign-off.
+- **Client:** 4 quick-scope presets layered onto the existing dedicated intake steps, urgency chips, no-login ticket timeline with revision count (0–2), WhatsApp handoff to `0206478727`, explicit client sign-off before `PENDING → AVAILABLE`.
+- **Admin:** split simulator extended with sub-agent override, manual MoMo batch CSV, deadline sorting by remaining hours, file-size caps and retention cleanup.
+- **Quota guardrails:** Neon free plan = 1 GB / 100 CU-hours; R2 free plan = 10 GB / 1M Class A / 10M Class B. Prefer indexed lookups, no server polling loops, 15 MB per-file intake cap, automated retention cleanup. R2 itself is not wired yet — storage is public Supabase Storage, so presigned 900s URLs remain blocked on a storage migration.
+- **Verification:** `tsc --noEmit`, `next build`, and headless-Chrome checks passed for `/`, `/intake`, `/track`, `/chat`, `/auth/signin`; new protected APIs return expected 403/405 unauthenticated. DB-backed flows remain unverified until `.env.local` is corrected.

@@ -1,8 +1,8 @@
 'use client'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 
-import { useMemo, useState } from 'react'
-import { ArrowLeft, ArrowRight, BookOpen, Check, Code2, FileText, Loader2, Palette, ShieldCheck, Sparkles } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { ArrowLeft, ArrowRight, BookOpen, Check, Code2, FileText, Loader2, Palette, ShieldCheck, Sparkles, Users } from 'lucide-react'
 
 type Profile = Record<string, unknown>
 
@@ -91,7 +91,21 @@ export function OnboardingClient({ name, initial, editing }: { name: string; ini
   const [subjectDraft, setSubjectDraft] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [uplineCode, setUplineCode] = useState('')
   const set = <K extends keyof typeof p>(k: K, v: (typeof p)[K]) => setP((x) => ({ ...x, [k]: v }))
+
+  // Invite links land at /onboarding?upline=CODE or /?upline=CODE; bind after the profile saves.
+  // Existing agents editing a profile are never rebound.
+  useEffect(() => {
+    if (editing) return
+    const fromUrl = new URLSearchParams(window.location.search).get('upline') || ''
+    let saved = ''
+    try {
+      const stored = JSON.parse(localStorage.getItem('inquire_upline') || 'null') as { code?: string } | null
+      saved = stored?.code || ''
+    } catch {}
+    setUplineCode((fromUrl || saved).trim().toUpperCase().slice(0, 20))
+  }, [editing])
 
   const skillOptions = useMemo(() => p.fields.flatMap((f) => SKILLS[f] || []), [p.fields])
   const academic = p.fields.includes('academic')
@@ -126,6 +140,11 @@ export function OnboardingClient({ name, initial, editing }: { name: string; ini
       const res = await fetch('/api/onboarding', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(p) })
       const d = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(d.error || 'Could not save your answers.')
+      if (uplineCode && !editing) {
+        const linkRes = await fetch(`/api/agent/upline?upline=${encodeURIComponent(uplineCode)}`, { method: 'POST' })
+        const link = await linkRes.json().catch(() => ({}))
+        if (!linkRes.ok) throw new Error(link.error || 'We could not link your invite code.')
+      }
       window.location.assign('/dashboard')
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not save your answers.')
@@ -316,6 +335,11 @@ export function OnboardingClient({ name, initial, editing }: { name: string; ini
                 </span>
               </label>
 
+              {uplineCode && (
+                <p className="flex items-center gap-2 rounded-2xl border border-violet-300/20 bg-violet-300/[0.06] px-4 py-3 text-xs text-violet-100">
+                  <Users className="size-4 text-violet-300" /> Joining under invite <strong className="font-mono">{uplineCode}</strong>. Your upline can only earn from Gemini Nexus margin, never from your pay.
+                </p>
+              )}
               <div className="rounded-2xl border border-white/10 bg-black/15 p-4 text-xs text-slate-400">
                 <p className="mb-2 flex items-center gap-1.5 font-semibold text-slate-200"><FileText className="size-3.5" /> Summary</p>
                 <p>{p.fields.map((f) => FIELD_CARDS.find((c) => c.value === f)?.title).join(', ') || '—'}</p>

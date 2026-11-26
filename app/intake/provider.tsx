@@ -3,9 +3,10 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { readClientProfile, saveClientProfile } from '@/lib/client-profile'
-import type { QuoteSelection } from '@/components/quote-estimator'
+import { defaultQuote, quoteFor, type QuoteSelection, type ScopeTrack } from '@/components/intake/pricing'
+import { quoteForPreset, type QuickScopePreset } from '@/components/intake/quick-scope'
 
-export type Track = 'academic' | 'media' | 'systems'
+export type Track = ScopeTrack
 
 type Draft = {
   track: Track
@@ -42,6 +43,7 @@ type IntakeContextValue = Draft & {
   setDeliverables: (value: string[]) => void
   setError: (value: string) => void
   updateQuote: (selection: QuoteSelection) => void
+  applyQuickScope: (preset: QuickScopePreset) => void
   selectFile: (file: File | null) => void
   selectFiles: (files: File[]) => void
   removeFile: (index: number) => void
@@ -53,18 +55,6 @@ const STORAGE_KEY = 'inquire_intake_draft'
 const MAX_FILE_BYTES = 15 * 1024 * 1024
 const REF_KEY = 'inquire_ref'
 const REF_DAYS = 30
-
-const defaultQuote: QuoteSelection = {
-  category: 'Proofreading & Formatting',
-  track: 'academic',
-  academicLevel: 'Undergraduate',
-  volume: 6,
-  unit: 'pages',
-  urgency: 'Standard',
-  citationAudit: false,
-  low: 48,
-  high: 84,
-}
 
 const defaults: Draft = {
   track: 'academic',
@@ -117,7 +107,7 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       const raw = sessionStorage.getItem(STORAGE_KEY)
       if (raw) {
         const saved = JSON.parse(raw) as Partial<Draft>
-        setDraft({ ...defaults, ...saved, quote: { ...defaultQuote, ...saved.quote } })
+        setDraft({ ...defaults, ...saved, quote: quoteFor({ ...defaultQuote, ...saved.quote }) })
       }
     } catch {}
     // Repeat clients keep their details in this browser only.
@@ -140,18 +130,18 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       setDraft((current) => ({ ...current, track: requested }))
     }
     const categoryPresets: Record<string, Partial<QuoteSelection>> = {
-      code: { category: 'Code Debugging & Architecture Review', track: 'systems', unit: 'hours', low: 210, high: 330 },
-      slides: { category: 'Slide Deck Design', track: 'media', unit: 'slides', low: 144, high: 240 },
-      research: { category: 'Study Guide Prep', track: 'academic', unit: 'modules', low: 108, high: 180 },
-      general: { category: 'Proofreading & Formatting', track: 'academic', unit: 'pages', low: 48, high: 84 },
+      code: { category: 'Code Debugging & Architecture Review', track: 'systems' },
+      slides: { category: 'Slide Deck Design', track: 'media' },
+      research: { category: 'Study Guide Prep', track: 'academic' },
+      system: { category: 'Data Analysis Walkthrough', track: 'systems' },
+      general: { category: 'Proofreading & Formatting', track: 'academic' },
     }
     const preset = categoryPresets[params.get('cat') || '']
     if (preset) {
-      setDraft((current) => ({
-        ...current,
-        track: preset.track || current.track,
-        quote: { ...current.quote, ...preset },
-      }))
+      setDraft((current) => {
+        const quote = quoteFor({ ...current.quote, ...preset })
+        return { ...current, track: quote.track, quote, urgency: quote.urgency }
+      })
     }
     setHydrated(true)
   }, [])
@@ -168,6 +158,12 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const updateQuote = useCallback((quote: QuoteSelection) => {
+    setDraft((current) => ({ ...current, quote, track: quote.track, urgency: quote.urgency }))
+  }, [])
+
+  // Quick scopes only prefill — every field remains editable in the estimator and steps below.
+  const applyQuickScope = useCallback((preset: QuickScopePreset) => {
+    const quote = quoteForPreset(preset)
     setDraft((current) => ({ ...current, quote, track: quote.track, urgency: quote.urgency }))
   }, [])
 
@@ -290,12 +286,13 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     setDeliverables: (value) => update('deliverables', value),
     setError,
     updateQuote,
+    applyQuickScope,
     selectFile,
     selectFiles,
     removeFile,
     dispatch,
     reset,
-  }), [draft, hydrated, file, files, returningClient, error, submitting, update, updateQuote, selectFile, selectFiles, removeFile, dispatch, reset])
+  }), [draft, hydrated, file, files, returningClient, error, submitting, update, updateQuote, applyQuickScope, selectFile, selectFiles, removeFile, dispatch, reset])
 
   return <IntakeContext.Provider value={value}>{children}</IntakeContext.Provider>
 }

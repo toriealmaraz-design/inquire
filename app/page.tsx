@@ -31,6 +31,7 @@ const reasons = [
 ]
 
 const REF_KEY = 'inquire_ref'
+const UPLINE_KEY = 'inquire_upline'
 const REF_DAYS = 30
 
 // Remember which agent's link brought the client here (30 days)
@@ -42,10 +43,23 @@ function rememberReferral() {
   document.cookie = `${REF_KEY}=${encodeURIComponent(code)}; Max-Age=${REF_DAYS * 86_400}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`
 }
 
+// Sub-agent invites use /?upline=CODE. Keep the code until the agent signs up;
+// onboarding applies it after the profile is saved.
+function rememberUpline() {
+  const code = new URLSearchParams(window.location.search).get('upline')
+  if (!code || !/^[A-Za-z0-9]{4,20}$/.test(code)) return
+  const upper = code.toUpperCase()
+  localStorage.setItem(UPLINE_KEY, JSON.stringify({ code: upper, at: Date.now() }))
+  document.cookie = `${UPLINE_KEY}=${encodeURIComponent(upper)}; Max-Age=${REF_DAYS * 86_400}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`
+}
+
 export default function Page() {
   const [mobileNav, setMobileNav] = useState(false)
 
-  useEffect(rememberReferral, [])
+  useEffect(() => {
+    rememberReferral()
+    rememberUpline()
+  }, [])
 
   return (
     <main className="portal-page min-h-screen overflow-x-hidden text-slate-100 selection:bg-cyan-300 selection:text-slate-950">

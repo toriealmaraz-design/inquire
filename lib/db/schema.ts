@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp, varchar } from 'drizzle-orm/pg-core'
+import { boolean, integer, jsonb, numeric, pgTable, serial, text, timestamp, varchar, type AnyPgColumn } from 'drizzle-orm/pg-core'
 
 // Users (supports Google OAuth and Email auth)
 export const users = pgTable('users', {
@@ -11,6 +11,8 @@ export const users = pgTable('users', {
   status: varchar('status', { length: 20 }).notNull().default('active'),
   field: varchar('field', { length: 30 }), // 'academic' | 'media' | 'systems'
   referralCode: varchar('referral_code', { length: 20 }).unique(),
+  // Two-tier network: an agent may invite one level of sub-agents (depth cap 2).
+  parentAgentId: integer('parent_agent_id').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
   profile: jsonb('profile'),
   onboardedAt: timestamp('onboarded_at'),
   signupNotified: boolean('signup_notified').notNull().default(false),
@@ -92,6 +94,12 @@ export const submissions = pgTable('submissions', {
   priceGhs: numeric('price_ghs', { precision: 10, scale: 2 }),
   commissionGhs: numeric('commission_ghs', { precision: 10, scale: 2 }),
   referralCommissionGhs: numeric('referral_commission_ghs', { precision: 10, scale: 2 }),
+  // Upline receives the override; the referring sub-agent is identified by referredBy.
+  uplineAgentId: integer('upline_agent_id').references((): AnyPgColumn => users.id, { onDelete: 'set null' }),
+  revisionCount: integer('revision_count').notNull().default(0),
+  clientSignoffAt: timestamp('client_signoff_at'),
+  commissionStatus: varchar('commission_status', { length: 20 }).notNull().default('PENDING'),
+  overrideGhs: numeric('override_ghs', { precision: 10, scale: 2 }),
   assignedAt: timestamp('assigned_at'),
   paidAt: timestamp('paid_at'),
   createdAt: timestamp('created_at').defaultNow(),

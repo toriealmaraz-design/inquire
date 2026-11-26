@@ -4,7 +4,7 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, FileText, Clock3, Zap, Copy, Check, Wallet, BookOpen } from 'lucide-react'
+import { LogOut, FileText, Clock3, Zap, Copy, Check, Wallet, BookOpen, Network } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { NotificationBell } from '@/components/notification-bell'
 import { Announcements } from '@/components/announcements'
@@ -14,6 +14,7 @@ import { QrPosterButton } from '@/components/agent/qr-poster'
 import { PromoLinks } from '@/components/agent/promo-links'
 import { PayoutHistory, type Payout } from '@/components/agent/payout-history'
 import { AgentStreak } from '@/components/agent/streak-tracker'
+import { SubagentRoster } from '@/components/agent/subagent-roster'
 
 type User = {
   id?: string
@@ -61,8 +62,9 @@ export function AgentDashboardClient({ user }: { user: User }) {
   const [supabase] = useState(() => createClient())
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
-  const [payoutData, setPayoutData] = useState<{ payouts: Payout[]; totalPaidGhs: number } | null>(null)
+  const [payoutData, setPayoutData] = useState<{ payouts: Payout[]; totalPaidGhs: number; overridePaidGhs: number } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [uplineCopied, setUplineCopied] = useState(false)
   const [origin, setOrigin] = useState('')
 
   const handleSignOut = async () => {
@@ -90,22 +92,25 @@ export function AgentDashboardClient({ user }: { user: User }) {
         if (!r.ok) throw new Error(data.error || 'Could not load payout history.')
         return data
       })
-      .then((data) => setPayoutData({ payouts: data.payouts || [], totalPaidGhs: Number(data.totalPaidGhs || 0) }))
-      .catch(() => setPayoutData({ payouts: [], totalPaidGhs: 0 }))
+      .then((data) => setPayoutData({ payouts: data.payouts || [], totalPaidGhs: Number(data.totalPaidGhs || 0), overridePaidGhs: Number(data.overridePaidGhs || 0) }))
+      .catch(() => setPayoutData({ payouts: [], totalPaidGhs: 0, overridePaidGhs: 0 }))
   }, [])
 
   const referralLink = earnings && origin ? `${origin}/?ref=${earnings.referralCode}` : ''
+  const inviteLink = earnings && origin ? `${origin}/onboarding?upline=${earnings.referralCode}` : ''
 
-  const copyLink = async () => {
-    if (!referralLink) return
+  const copy = async (text: string, done: (v: boolean) => void) => {
+    if (!text) return
     try {
-      await navigator.clipboard.writeText(referralLink)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
+      await navigator.clipboard.writeText(text)
+      done(true)
+      setTimeout(() => done(false), 2000)
     } catch {
-      window.prompt('Copy your link:', referralLink)
+      window.prompt('Copy your link:', text)
     }
   }
+
+  const copyLink = () => copy(referralLink, setCopied)
 
 
   useEffect(() => {
@@ -245,6 +250,29 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </>
           )}
         </div>
+
+        {/* Sub-agent invite + anonymized roster */}
+        <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
+          <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Network className="size-4 text-violet-300" /> Invite sub-agents</AnimatedHeading>
+          <p className="mt-1 text-xs text-slate-500">Share this link. The network stops at two levels, and your overrides come only from Gemini Nexus margin — never from a sub-agent&apos;s pay or the specialist&apos;s fee.</p>
+          <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+            <input
+              readOnly
+              value={inviteLink}
+              onFocus={(e) => e.currentTarget.select()}
+              aria-label="Your sub-agent invite link"
+              className="h-11 flex-1 rounded-xl border border-white/10 bg-black/20 px-4 font-mono text-xs text-cyan-100 outline-none"
+            />
+            <button type="button" onClick={() => copy(inviteLink, setUplineCopied)} className="flex h-11 items-center justify-center gap-2 rounded-xl bg-violet-300 px-4 text-sm font-bold text-slate-950 hover:bg-violet-200">
+              {uplineCopied ? <><Check className="size-4" /> Copied</> : <><Copy className="size-4" /> Copy invite</>}
+            </button>
+          </div>
+          <p className="mt-3 text-xs text-slate-400">
+            Override earnings: <strong className="text-emerald-300">GHS {(payoutData?.overridePaidGhs ?? 0).toFixed(2)}</strong> · funded from Gemini Nexus platform margin.
+          </p>
+        </div>
+
+        <SubagentRoster />
 
         {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
