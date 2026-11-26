@@ -58,6 +58,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
   const [copied, setCopied] = useState(false)
+  const [kitCopied, setKitCopied] = useState(false)
   const [origin, setOrigin] = useState('')
 
   const handleSignOut = async () => {
@@ -93,6 +94,27 @@ export function AgentDashboardClient({ user }: { user: User }) {
     }
   }
 
+  const copyMarketingKit = async () => {
+    if (!referralLink) return
+    const kit = [
+      `WhatsApp status: Need a hand with a research brief, presentation, or software project? Gemini Nexus connects you with the right specialist. Start here: ${referralLink}`,
+      `Campus group: Gemini Nexus is taking requests for research support, slide decks, code debugging, and web systems. Share your brief for a custom GHS quote: ${referralLink}`,
+      `Quick follow-up: Have a brief to move forward? Send it to Gemini Nexus and track progress with your ticket number: ${referralLink}`,
+    ].join('\n\n')
+    try {
+      await navigator.clipboard.writeText(kit)
+      setKitCopied(true)
+      setTimeout(() => setKitCopied(false), 2500)
+    } catch {
+      window.prompt('Copy your marketing kit:', kit)
+    }
+  }
+
+
+  const referralCount = earnings?.referred ?? 0
+  const tier = referralCount >= 15 ? 'Nexus Partner' : referralCount >= 5 ? 'Campus Connector' : 'Starter'
+  const nextTierAt = referralCount >= 15 ? 15 : referralCount >= 5 ? 15 : 5
+  const tierProgress = referralCount >= 15 ? 100 : referralCount >= 5 ? Math.min(100, ((referralCount - 5) / 10) * 100) : Math.min(100, (referralCount / 5) * 100)
 
   useEffect(() => {
     load()
@@ -219,6 +241,25 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </>
           )}
         </div>
+
+        <section className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`} aria-labelledby="growth-heading">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div><AnimatedHeading as="h2" id="growth-heading" className="font-bold">Campus growth</AnimatedHeading><p className="mt-1 text-xs text-slate-500">Your tier is based on the briefs attributed to your referral link.</p></div>
+            <span className="rounded-full border border-cyan-300/20 bg-cyan-300/10 px-3 py-1 text-xs font-semibold text-cyan-100">{tier}</span>
+          </div>
+          <div className="mt-5" role="progressbar" aria-label="Progress to next agent tier" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(tierProgress)}>
+            <div className="flex justify-between text-[11px] text-slate-400"><span>{referralCount} referred briefs</span><span>{referralCount >= 15 ? 'Top tier reached' : `${Math.max(0, nextTierAt - referralCount)} to next tier`}</span></div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-white/10"><div className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-violet-400 transition-[width]" style={{ width: `${tierProgress}%` }} /></div>
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-3">
+            {[['Starter', '0–4 briefs', '10% target'], ['Campus Connector', '5–14 briefs', '15% target'], ['Nexus Partner', '15+ briefs', '20% target']].map(([name, range, reward]) => <div key={name} className={`rounded-xl border p-3 ${tier === name ? 'border-cyan-300/40 bg-cyan-300/[.06]' : 'border-white/10 bg-white/[.025]'}`}><p className="text-xs font-semibold text-white">{name}</p><p className="mt-1 text-[11px] text-slate-500">{range} · {reward}</p></div>)}
+          </div>
+          <p className="mt-3 text-[11px] leading-5 text-slate-500">Tier rates are growth targets. Your active commission rate is the approved rate shown in your earnings and is applied when jobs are priced.</p>
+          <div className="mt-5 flex flex-col justify-between gap-3 rounded-2xl border border-white/10 bg-white/[.03] p-4 sm:flex-row sm:items-center">
+            <div><p className="text-sm font-semibold text-white">Copy marketing kit</p><p className="mt-1 text-xs text-slate-500">Three ready-to-share WhatsApp captions with your referral link.</p></div>
+            <button onClick={copyMarketingKit} disabled={!referralLink} className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-cyan-300/30 bg-cyan-300/10 px-4 text-xs font-bold text-cyan-100 hover:bg-cyan-300/15 disabled:opacity-50"><Copy className="size-4" />{kitCopied ? 'Kit copied' : 'Copy kit'}</button>
+          </div>
+        </section>
 
         {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>

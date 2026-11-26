@@ -13,12 +13,12 @@ type Result =
 // Map a brief's status to a 4-step progress stage (0-3).
 function stageOf(status: string): number {
   const s = status.toLowerCase()
-  if (s.includes('paid') || s.includes('complete') || s.includes('delivered')) return 3
-  if (s.includes('progress') || s.includes('assigned') || s.includes('working')) return 2
-  if (s.includes('quote') && !s.includes('pending')) return 1
+  if (s.includes('ready') || s.includes('deliver') || s.includes('paid') || s.includes('complete')) return 3
+  if (s.includes('review') || s.includes('qa') || s.includes('progress') || s.includes('working')) return 2
+  if (s.includes('assigned') || s.includes('triaged')) return 1
   return 0
 }
-const STEPS = ['Received', 'Quoted', 'In progress', 'Completed']
+const STEPS = ['Brief Received', 'Specialist Assigned', 'In Review', 'Ready for Delivery']
 
 export default function TrackPage() {
   const [ticket, setTicket] = useState('')
