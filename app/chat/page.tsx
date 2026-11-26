@@ -8,7 +8,7 @@ import { Lightbox } from '@/components/lightbox'
 import { BrandLogo } from '@/components/branding'
 import { createClient } from '@/lib/supabase/client'
 import { previewText } from '@/lib/text'
-import { PRESENCE_CHANNEL } from '@/components/support-presence'
+import { hasStaff, usePresence } from '@/lib/presence'
 
 type Reactions = Record<string, string[]>
 type Message = {
@@ -101,9 +101,10 @@ export default function ChatPage() {
     () => (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? createClient() : null),
     []
   )
+  const { state: presenceState, synced: presenceSynced } = usePresence('visitor')
+  const online: boolean | null = presenceSynced ? hasStaff(presenceState) : null
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
-  const [online, setOnline] = useState<boolean | null>(null)
   const [convoId, setConvoId] = useState<number | null>(null)
   const [profile, setProfile] = useState<Stored | null>(null)
   const [editingName, setEditingName] = useState(false)
@@ -213,24 +214,6 @@ export default function ChatPage() {
       window.history.replaceState(null, '', '/chat')
     }
   }, [])
-
-  // Real "online": is any admin on the chat console or dashboard right now?
-  useEffect(() => {
-    if (!supabase) return
-    // Also announce this visitor so admins see "visitors on Live Chat" in their console
-    const visitorKey = `visitor-${Math.random().toString(36).slice(2, 10)}`
-    const channel = supabase.channel(PRESENCE_CHANNEL, { config: { presence: { key: visitorKey } } })
-    const update = () => setOnline(Object.keys(channel.presenceState()).some((k) => k.startsWith('staff-')))
-    channel.on('presence', { event: 'sync' }, update).subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        channel.track({ visitor: true, at: Date.now() })
-        setTimeout(update, 1500)
-      }
-    })
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [supabase])
 
   // Greeting + away message from the admin's chatbot settings
   const [botCfg, setBotCfg] = useState<{ greeting: string; away: string; autoReplyEnabled: boolean }>({ greeting: '', away: '', autoReplyEnabled: false })

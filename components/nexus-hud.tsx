@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { Activity, ChevronDown, Clock3, MessageCircle, Radio } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { PRESENCE_CHANNEL } from '@/components/support-presence'
+import { hasStaff, usePresence } from '@/lib/presence'
 import { openCommandBar } from '@/components/command-bar'
 
 const ghanaTime = () =>
@@ -17,30 +16,14 @@ const ghanaTime = () =>
 /** Compact operations readout: Ghana time, live specialist status, command access. */
 export function NexusHud() {
   const [time, setTime] = useState('')
-  const [online, setOnline] = useState(false)
   const [expanded, setExpanded] = useState(false)
+  const { state } = usePresence()
+  const online = hasStaff(state)
 
   useEffect(() => {
     setTime(ghanaTime())
     const timer = window.setInterval(() => setTime(ghanaTime()), 1000)
     return () => window.clearInterval(timer)
-  }, [])
-
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return
-    const supabase = createClient()
-    const channel = supabase.channel(PRESENCE_CHANNEL, {
-      config: { presence: { key: `hud-${Math.random().toString(36).slice(2, 10)}` } },
-    })
-    channel.on('presence', { event: 'sync' }, () => {
-      setOnline(Object.keys(channel.presenceState()).some((key) => key.startsWith('staff-')))
-    })
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') channel.track({ hud: true, at: Date.now() })
-    })
-    return () => {
-      supabase.removeChannel(channel)
-    }
   }, [])
 
   return (

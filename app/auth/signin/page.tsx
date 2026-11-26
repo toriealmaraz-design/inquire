@@ -16,8 +16,15 @@ const ERROR_MESSAGES: Record<string, string> = {
   access_denied: 'Google sign-in was cancelled.',
 }
 
-function friendlyError(code: string | null) {
+function friendlyError(code: string | null, detail: string | null) {
   if (!code) return ''
+  if (code === 'account_lookup_failed') {
+    if (detail === 'db_project_mismatch') {
+      return 'Database configuration mismatch: DATABASE_URL points to a different Supabase project than NEXT_PUBLIC_SUPABASE_URL. Update DATABASE_URL in Vercel and in .env.local, then try again.'
+    }
+    if (detail === 'db_missing') return 'Database connection is not configured. Set DATABASE_URL in Vercel and in .env.local, then try again.'
+    if (detail === 'db_invalid') return 'DATABASE_URL is not a valid connection string. Check the value in Vercel and .env.local.'
+  }
   return ERROR_MESSAGES[code] || code
 }
 
@@ -31,10 +38,11 @@ function AuthContent() {
   const router = useRouter()
   const redirectTo = safePath(searchParams.get('redirectTo'))
   const initialError = searchParams.get('error')
+  const initialDetail = searchParams.get('detail')
   
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState(friendlyError(initialError))
+  const [error, setError] = useState(friendlyError(initialError, initialDetail))
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   

@@ -84,6 +84,22 @@ export async function getUserOrThrow(): Promise<AppUser | null> {
   }
 }
 
+// Never prints credentials — only compares the Supabase project refs embedded in
+// the public URL and the pooler username so admins get an actionable diagnosis.
+function accountLookupDetail(): 'db_missing' | 'db_invalid' | 'db_project_mismatch' | 'db_unreachable' {
+  const databaseUrl = process.env.DATABASE_URL
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  if (!databaseUrl || !supabaseUrl) return 'db_missing'
+  try {
+    const dbRef = new URL(databaseUrl).username.split('.')[1] || ''
+    const appRef = new URL(supabaseUrl).hostname.split('.')[0]
+    if (dbRef && appRef && dbRef !== appRef) return 'db_project_mismatch'
+  } catch {
+    return 'db_invalid'
+  }
+  return 'db_unreachable'
+}
+
 // For pages: like getUserOrThrow, but a database failure sends the person to the
 // sign-in page WITH an explanation instead of looping silently.
 export async function getPageUser(): Promise<AppUser | null> {
@@ -95,7 +111,7 @@ export async function getPageUser(): Promise<AppUser | null> {
     if (!(error instanceof AccountLookupError)) throw error
     failed = true
   }
-  if (failed) redirect('/auth/signin?error=account_lookup_failed')
+  if (failed) redirect(`/auth/signin?error=account_lookup_failed&detail=${accountLookupDetail()}`)
   return user
 }
 

@@ -1,33 +1,18 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Eye } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { countVisitors, usePresence } from '@/lib/presence'
 
-export const PRESENCE_CHANNEL = 'support-presence'
+export { PRESENCE_CHANNEL } from '@/lib/presence'
 
 /**
  * Mount on admin pages: marks this admin as "online" for clients on /chat
  * (goes offline when the tab closes). With showVisitors, also shows how many
  * possible clients currently have Live Chat open.
  */
-export function SupportPresence({ userId, showVisitors = false }: { userId: string; showVisitors?: boolean }) {
-  const [visitors, setVisitors] = useState(0)
-
-  useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_SUPABASE_URL) return
-    const supabase = createClient()
-    const channel = supabase.channel(PRESENCE_CHANNEL, { config: { presence: { key: `staff-${userId}` } } })
-    // A presence listener must be bound before subscribing or tracking is ignored
-    channel
-      .on('presence', { event: 'sync' }, () => setVisitors(Object.keys(channel.presenceState()).filter((k) => k.startsWith('visitor-')).length))
-      .subscribe((status) => {
-        if (status === 'SUBSCRIBED') channel.track({ staff: true, at: Date.now() })
-      })
-    return () => {
-      supabase.removeChannel(channel)
-    }
-  }, [userId])
+export function SupportPresence({ showVisitors = false }: { userId: string; showVisitors?: boolean }) {
+  const { state } = usePresence('staff')
+  const visitors = countVisitors(state)
 
   if (!showVisitors) return null
   return (
