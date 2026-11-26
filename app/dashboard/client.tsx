@@ -15,6 +15,12 @@ import { FeedbackManager } from '@/components/feedback-manager'
 import { UsersPanel } from '@/components/users-panel'
 import { RoleWatcher } from '@/components/role-watcher'
 import { AnalyticsBoard } from '@/components/analytics-board'
+import { AgingBadge } from '@/components/admin/aging-badge'
+import { downloadBriefPacket } from '@/components/admin/brief-packet'
+import { FlaggedContacts, type Flag } from '@/components/admin/flagged-contacts'
+import { MarginSimulator } from '@/components/admin/margin-simulator'
+import { WeeklySnapshot } from '@/components/admin/weekly-snapshot'
+import { contactKey } from '@/lib/phone'
 import { BriefEditor } from '@/components/brief-editor'
 import { ComplaintsInbox } from '@/components/complaints'
 import { ContactSuperAdmin } from '@/components/contact-super-admin'
@@ -40,6 +46,7 @@ import {
   Trophy,
   MessageSquareWarning,
   Percent,
+  AlertTriangle,
 } from 'lucide-react'
 
 type User = {
@@ -104,6 +111,8 @@ type IntakeRow = {
   priceGhs: string | null
   commissionGhs: string | null
   paidAt: string | null
+  deadline?: string | null
+  dueAt?: string | null
 }
 
 type DbMsg = {
@@ -142,6 +151,7 @@ export function DashboardClient({ user }: { user: User }) {
   const [uploads, setUploads] = useState<UploadRow[]>([])
   const [intake, setIntake] = useState<IntakeRow[]>([])
   const [commissionPercent, setCommissionPercent] = useState('')
+  const [flagged, setFlagged] = useState<Flag[]>([])
   const [handles, setHandles] = useState({ whatsapp: '', telegram: '', instagram: '', snapchat: '', email: '' })
   const [settingsError, setSettingsError] = useState('')
   const [priceDraft, setPriceDraft] = useState<Record<number, string>>({})
@@ -243,13 +253,15 @@ export function DashboardClient({ user }: { user: User }) {
     const fetchData = async () => {
       try {
         // Load everything in parallel instead of one request after another
-        const [usersData, settingsData, intakeData] = await Promise.all([
+        const [usersData, settingsData, intakeData, flaggedData] = await Promise.all([
           isSuperAdmin ? fetch('/api/admin/users').then((r) => r.json()).catch(() => []) : Promise.resolve([]),
           isSuperAdmin ? fetch('/api/settings?scope=admin').then((r) => r.json()).catch(() => ({})) : Promise.resolve({}),
           fetch('/api/submissions').then((r) => (r.ok ? r.json() : [])).catch(() => []),
+          isSuperAdmin ? fetch('/api/admin/flagged').then((r) => (r.ok ? r.json() : { flags: [] })).catch(() => ({ flags: [] })) : Promise.resolve({ flags: [] }),
         ])
         setUsers(Array.isArray(usersData) ? usersData : [])
         setIntake(Array.isArray(intakeData) ? intakeData : [])
+        setFlagged(Array.isArray(flaggedData?.flags) ? flaggedData.flags : [])
         if (settingsData.commissionPercent !== undefined) setCommissionPercent(String(settingsData.commissionPercent))
         if (isSuperAdmin) setHandles({ whatsapp: settingsData.whatsapp || '', telegram: settingsData.telegram || '', instagram: settingsData.instagram || '', snapchat: settingsData.snapchat || '', email: settingsData.email || '' })
       } catch (error) {
@@ -332,6 +344,7 @@ export function DashboardClient({ user }: { user: User }) {
     const digits = v.replace(/\D/g, '')
     return digits.length >= 9 && digits.length >= v.replace(/[\s+()-]/g, '').length - 1 ? `tel:${digits.slice(-9)}` : v.replace(/^@/, '')
   }
+  const flaggedKeys = new Set(flagged.map((flag) => contactKey(flag.phoneKey || flag.phone)))
   type ClientFolder = { key: string; name: string; contact: string; briefs: IntakeRow[]; files: UploadRow[]; last: number }
   const folders = (() => {
     const map = new Map<string, ClientFolder>()
@@ -517,8 +530,18 @@ export function DashboardClient({ user }: { user: User }) {
         <RoleWatcher role={user.role} status={user.status} field={user.field} />
         {(isSuperAdmin || isSubAdmin) && <SupportPresence userId={String(user.id ?? user.email)} />}
 
-          {/* Overview Tab: analytics */}
-          {tab === 'Overview' && <AnalyticsBoard onNavigate={(t) => nav.includes(t) && setTab(t)} />}
+          {/* Overview Tab: command center */}
+          {tab === 'Overview' && (
+            <>
+              {(isSuperAdmin || isSubAdmin) && (
+                <div className="mt-8 grid gap-5 xl:grid-cols-2">
+                  <WeeklySnapshot briefs={intake} commissionPercent={commissionPercent} />
+                  <MarginSimulator commissionPercent={commissionPercent} />
+                </div>
+              )}
+              <AnalyticsBoard onNavigate={(t) => nav.includes(t) && setTab(t)} />
+            </>
+          )}
 
           {/* User Management Tab (Super Admin only) */}
           {tab === 'User Management' && isSuperAdmin && (
@@ -582,6 +605,7 @@ export function DashboardClient({ user }: { user: User }) {
                     </div>
                   </div>
                 </div>
+                {isSuperAdmin && <FlaggedContacts flags={flagged} onUpdate={setFlagged} />}
               </div>
 
               {visibleFolders.length === 0 ? (
@@ -603,6 +627,7 @@ export function DashboardClient({ user }: { user: User }) {
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold text-white" title={title}>{title}</p>
                           <p className="truncate text-xs text-slate-400">{g.contact && g.contact !== title ? g.contact : g.name ? '' : 'No contact given'}</p>
+                          {flaggedKeys.has(g.key) && <span title="This contact is flagged as high risk" className="mt-1 inline-flex w-fit items-center gap-1 rounded-full border border-rose-300/30 bg-rose-400/10 px-2 py-0.5 text-[10px] font-bold text-rose-200"><AlertTriangle className="size-3" /> High-risk flag</span>}
                         </div>
                         <div className="flex flex-wrap gap-1.5 text-[11px]">
                           <span className="rounded-full bg-cyan-300/10 px-2 py-0.5 text-cyan-200">{g.briefs.length} brief{g.briefs.length === 1 ? '' : 's'}</span>
@@ -655,10 +680,14 @@ export function DashboardClient({ user }: { user: User }) {
                               <Pencil className="size-3" />
                             </button>
                           </p>
-                          <p className="mt-0.5 text-[11px] text-slate-500"><span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}</p>
+                          <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+                            <span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}
+                            <AgingBadge brief={s} />
+                          </p>
                         </div>
                         <span className="flex items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
+                          <button onClick={() => downloadBriefPacket(s)} title="Download sanitized specialist packet" aria-label={`Packet for ${s.ticketId}`} className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200 hover:border-cyan-300/60 hover:text-cyan-100">Packet</button>
                           {isSuperAdmin && (
                             <>
                               <button onClick={() => setEditing(editing === s.id ? null : s.id)} title="Edit everything" aria-label={`Edit ${s.ticketId}`} className="rounded-lg border border-white/10 px-2 py-0.5 text-[11px] text-slate-300 hover:border-cyan-300/50 hover:text-cyan-200">Edit</button>

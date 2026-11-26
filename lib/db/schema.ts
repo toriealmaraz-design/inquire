@@ -193,3 +193,15 @@ export const testimonials = pgTable('testimonials', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 export type Testimonial = typeof testimonials.$inferSelect
+
+// High-risk client contacts. `phoneKey` matches the dashboard's client-folder key.
+export const flaggedContacts = pgTable('flagged_contacts', {
+  id: serial('id').primaryKey(),
+  phone: varchar('phone', { length: 80 }).notNull(),
+  phoneKey: varchar('phone_key', { length: 80 }).notNull().unique(),
+  reason: varchar('reason', { length: 120 }).notNull().default('High risk'),
+  note: text('note'),
+  createdBy: integer('created_by').references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+})
+export type FlaggedContact = typeof flaggedContacts.$inferSelect

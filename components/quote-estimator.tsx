@@ -3,6 +3,7 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useEffect, useMemo, useState } from 'react'
 import { Check, Clock3, FileText, Plus } from 'lucide-react'
+import { deadlineFor, deadlineOptions } from '@/components/intake/pricing'
 
 type Track = 'academic' | 'media' | 'systems'
 type CategoryId = 'proofreading' | 'code-debugging' | 'data-analysis' | 'slide-design' | 'study-guides'
@@ -60,7 +61,7 @@ export function QuoteEstimator({
 
   const selection = useMemo(() => {
     const level = levelMultipliers[academicLevel] ?? 1
-    const urgencyMultiplier = urgency === '24-Hour Priority' ? 1.25 : urgency === '48-Hour' ? 1.1 : 1
+    const urgencyMultiplier = deadlineFor(urgency).multiplier
     const audit = citationAudit ? 15 : 0
     return {
       category: selected.title,
@@ -106,19 +107,21 @@ export function QuoteEstimator({
       </div>
 
       <fieldset className="mt-5">
-        <legend className="text-xs font-semibold text-slate-300">Turnaround</legend>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {[
-            ['Standard', '3–5 days'],
-            ['48-Hour', 'Priority'],
-            ['24-Hour Priority', '+25%'],
-          ].map(([value, description]) => (
-            <button key={value} type="button" aria-pressed={urgency === value} onClick={() => setUrgency(value)} className={`rounded-xl border px-1.5 py-2.5 text-left transition sm:px-2 ${urgency === value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20'}`}>
-              <span className="block text-[11px] font-bold">{value === '24-Hour Priority' ? '24 hours' : value === '48-Hour' ? '48 hours' : 'Standard'}</span>
-              <span className="mt-0.5 block text-[10px]">{description}</span>
+        <legend className="text-xs font-semibold text-slate-300">Deadline / turnaround</legend>
+        <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+          {deadlineOptions.map((option) => (
+            <button key={option.value} type="button" aria-pressed={urgency === option.value} onClick={() => setUrgency(option.value)} className={`rounded-xl border px-1.5 py-2.5 text-left transition sm:px-2 ${urgency === option.value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-white/20'}`}>
+              <span className="block text-[11px] font-bold">{option.short}</span>
+              <span className="mt-0.5 block text-[10px]">{option.detail}</span>
             </button>
           ))}
         </div>
+        {deadlineFor(urgency).badge && (
+          <p className="mt-2 flex items-center gap-1.5 text-[11px] text-cyan-200">
+            <span className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-2 py-0.5 font-bold">{deadlineFor(urgency).badge}</span>
+            <span className="text-slate-500">applied to the range below</span>
+          </p>
+        )}
       </fieldset>
 
       <label className="mt-4 flex cursor-pointer items-center gap-2.5 rounded-xl border border-white/10 bg-white/[.03] px-3 py-3 text-xs text-slate-300">

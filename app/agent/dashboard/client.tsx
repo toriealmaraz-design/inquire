@@ -4,12 +4,16 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { LogOut, FileText, Bell, Zap, Copy, Check, Wallet, BookOpen } from 'lucide-react'
+import { LogOut, FileText, Clock3, Zap, Copy, Check, Wallet, BookOpen } from 'lucide-react'
 import { PushPrompt } from '@/components/push-prompt'
 import { NotificationBell } from '@/components/notification-bell'
 import { Announcements } from '@/components/announcements'
 import { Leaderboard } from '@/components/leaderboard'
 import { RoleWatcher } from '@/components/role-watcher'
+import { QrPosterButton } from '@/components/agent/qr-poster'
+import { PromoLinks } from '@/components/agent/promo-links'
+import { PayoutHistory, type Payout } from '@/components/agent/payout-history'
+import { AgentStreak } from '@/components/agent/streak-tracker'
 
 type User = {
   id?: string
@@ -57,6 +61,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
   const [supabase] = useState(() => createClient())
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
+  const [payoutData, setPayoutData] = useState<{ payouts: Payout[]; totalPaidGhs: number } | null>(null)
   const [copied, setCopied] = useState(false)
   const [origin, setOrigin] = useState('')
 
@@ -78,6 +83,15 @@ export function AgentDashboardClient({ user }: { user: User }) {
         setEarnings(data)
       })
       .catch((e) => setEarningsError(e instanceof Error ? e.message : 'Could not load your referral link.'))
+
+    fetch('/api/agent/payouts')
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(data.error || 'Could not load payout history.')
+        return data
+      })
+      .then((data) => setPayoutData({ payouts: data.payouts || [], totalPaidGhs: Number(data.totalPaidGhs || 0) }))
+      .catch(() => setPayoutData({ payouts: [], totalPaidGhs: 0 }))
   }, [])
 
   const referralLink = earnings && origin ? `${origin}/?ref=${earnings.referralCode}` : ''
@@ -158,21 +172,32 @@ export function AgentDashboardClient({ user }: { user: User }) {
         </div>
         <p className="mt-1 text-sm text-slate-400">Your assignments, referral link and commission.</p>
 
-        {/* Stats */}
-        <div className="mt-6 grid gap-4 sm:grid-cols-3">
-          {[
-            ['Assignments', earnings?.assignedCount ?? 0, FileText, 'text-violet-400'],
-            ['Pending', `GHS ${(earnings?.pendingEarnings ?? 0).toFixed(2)}`, Bell, 'text-amber-300'],
-            ['Earned', `GHS ${(earnings?.totalEarned ?? 0).toFixed(2)}`, Wallet, 'text-emerald-300'],
-          ].map(([label, value, Icon, color]: any) => (
-            <div key={label} className={`${glass} rounded-2xl p-5`}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs text-slate-500">{label}</span>
-                <Icon className={`size-4 ${color}`} />
-              </div>
-              <p className="mt-4 text-2xl font-bold">{value}</p>
+        {/* Earnings & streak counters */}
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className={`${glass} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Assignments</span>
+              <FileText className="size-4 text-violet-400" />
             </div>
-          ))}
+            <p className="mt-4 text-2xl font-bold">{earnings?.assignedCount ?? 0}</p>
+          </div>
+          <div className={`${glass} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Pending Clearance</span>
+              <Clock3 className="size-4 text-amber-300" />
+            </div>
+            <p className="mt-4 text-2xl font-bold">GHS {(earnings?.pendingEarnings ?? 0).toFixed(2)}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">In-progress tickets, not yet cleared</p>
+          </div>
+          <div className={`${glass} rounded-2xl p-5`}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-500">Available for MoMo Withdrawal</span>
+              <Wallet className="size-4 text-emerald-300" />
+            </div>
+            <p className="mt-4 text-2xl font-bold">GHS {(earnings?.totalEarned ?? 0).toFixed(2)}</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Cleared paid referrals &amp; assignments</p>
+          </div>
+          <AgentStreak payouts={payoutData?.payouts ?? null} />
         </div>
 
 
@@ -203,12 +228,12 @@ export function AgentDashboardClient({ user }: { user: User }) {
                   {copied ? <><Check className="size-4" /> Copied</> : <><Copy className="size-4" /> Copy link</>}
                 </button>
               </div>
-              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <QrPosterButton link={referralLink} code={earnings.referralCode} name={user.name || ''} />
+              <div className="mt-4 grid grid-cols-3 gap-3">
                 {[
                   ['Briefs referred', String(earnings.referred)],
-                  ['Pending', `GHS ${earnings.pendingEarnings.toFixed(2)}`],
                   ['Paid jobs', String(earnings.paidCount)],
-                  ['Earned', `GHS ${earnings.totalEarned.toFixed(2)}`],
+                  ['Commission', `${earnings.commissionPercent}%`],
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-2xl border border-white/10 bg-white/5 p-4">
                     <p className="text-[11px] text-slate-500">{label}</p>
@@ -216,6 +241,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
                   </div>
                 ))}
               </div>
+              <PromoLinks code={earnings.referralCode} origin={origin} />
             </>
           )}
         </div>
@@ -249,6 +275,12 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </ul>
           )}
         </div>
+
+        <PayoutHistory
+          payouts={payoutData?.payouts ?? null}
+          totalPaidGhs={payoutData?.totalPaidGhs ?? 0}
+          agentName={user.name || ''}
+        />
 
         <div className="mt-6"><Leaderboard compact /></div>
 

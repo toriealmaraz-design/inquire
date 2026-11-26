@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { ArrowRight, Clock3, Sparkles } from 'lucide-react'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { previewText } from '@/lib/text'
+import { deadlineFor, deadlineOptions } from '@/components/intake/pricing'
 
 type Track = 'academic' | 'media' | 'systems'
 
@@ -13,12 +14,6 @@ const options: { id: string; label: string; track: Track; unit: string; low: num
   { id: 'debugging', label: 'Code debugging review', track: 'systems', unit: 'hours', low: 35, high: 55 },
 ]
 
-const urgencyOptions = [
-  { value: 'Standard', label: 'Standard', multiplier: 1 },
-  { value: '48-Hour', label: '48 hours', multiplier: 1.1 },
-  { value: '24-Hour Priority', label: '24 hours', multiplier: 1.25 },
-]
-
 /** Landing-page teaser for the same GHS estimate used inside the intake flow. */
 export function QuickQuote() {
   const [optionId, setOptionId] = useState(options[0].id)
@@ -26,7 +21,8 @@ export function QuickQuote() {
   const [urgency, setUrgency] = useState('Standard')
 
   const option = options.find((item) => item.id === optionId) ?? options[0]
-  const multiplier = urgencyOptions.find((item) => item.value === urgency)?.multiplier ?? 1
+  const deadline = deadlineFor(urgency)
+  const multiplier = deadline.multiplier
   const estimate = useMemo(() => ({
     low: Math.round(option.low * volume * multiplier),
     high: Math.round(option.high * volume * multiplier),
@@ -60,14 +56,16 @@ export function QuickQuote() {
             <input id="quick-volume" type="range" min={1} max={20} value={volume} onChange={(event) => setVolume(Number(event.target.value))} aria-label={`Volume in ${option.unit}`} className="mt-3 h-2 w-full accent-cyan-300" />
 
             <fieldset className="mt-5">
-              <legend className="flex items-center gap-1.5 text-xs font-semibold text-slate-300"><Clock3 className="size-3.5" /> Turnaround</legend>
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                {urgencyOptions.map((item) => (
-                  <button key={item.value} type="button" aria-pressed={urgency === item.value} onClick={() => setUrgency(item.value)} className={`rounded-xl border px-2 py-2 text-xs font-semibold transition ${urgency === item.value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-cyan-300/30'}`}>
-                    {item.label}
+              <legend className="flex items-center gap-1.5 text-xs font-semibold text-slate-300"><Clock3 className="size-3.5" /> Deadline / turnaround</legend>
+              <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-5">
+                {deadlineOptions.map((item) => (
+                  <button key={item.value} type="button" aria-pressed={urgency === item.value} onClick={() => setUrgency(item.value)} className={`rounded-xl border px-1 py-2 text-center transition ${urgency === item.value ? 'border-cyan-300/60 bg-cyan-300/10 text-cyan-100' : 'border-white/10 bg-white/[.03] text-slate-400 hover:border-cyan-300/30'}`}>
+                    <span className="block text-[11px] font-bold">{item.short}</span>
+                    <span className="mt-0.5 block text-[10px]">{item.detail}</span>
                   </button>
                 ))}
               </div>
+              {deadline.badge && <p className="mt-2 text-[11px] text-cyan-200"><span className="rounded-full border border-cyan-300/40 bg-cyan-300/10 px-2 py-0.5 font-bold">{deadline.badge}</span> · included in the range</p>}
             </fieldset>
 
             <div aria-live="polite" className="mt-6 flex flex-wrap items-end justify-between gap-3 border-t border-white/10 pt-5">

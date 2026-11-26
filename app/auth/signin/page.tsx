@@ -3,7 +3,7 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { createClient } from '@/lib/supabase/client'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { Suspense, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
 
@@ -45,6 +45,16 @@ function AuthContent() {
   const [error, setError] = useState(friendlyError(initialError, initialDetail))
   const [success, setSuccess] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [honeypot, setHoneypot] = useState('')
+  const signupOpenedAt = useRef(Date.now())
+
+  // Give signup bots (and humans) the same minimum review window as intake dispatch.
+  useEffect(() => {
+    if (mode === 'signup') {
+      signupOpenedAt.current = Date.now()
+      setHoneypot('')
+    }
+  }, [mode])
   
   // Form fields
   const [email, setEmail] = useState('')
@@ -107,6 +117,11 @@ function AuthContent() {
 
   const signUpWithEmail = async (e: React.FormEvent) => {
     e.preventDefault()
+    // Bot checks stay client-side; no honeypot or timing data is sent to Supabase.
+    if (honeypot.trim() || Date.now() - signupOpenedAt.current < 3000) {
+      setError('That was a little too quick. Take a moment and try again.')
+      return
+    }
     if (!email || !password || !fullName) {
       setError('Please fill in all fields')
       return
@@ -244,6 +259,12 @@ function AuthContent() {
 
         {/* Email Form */}
         <form onSubmit={mode === 'signin' ? signInWithEmail : signUpWithEmail} className="mt-6 space-y-4">
+          {mode === 'signup' && (
+            <div aria-hidden="true" className="pointer-events-none absolute left-[-9999px] top-0 h-0 w-0 overflow-hidden opacity-0">
+              <label htmlFor="signup-website">Website</label>
+              <input id="signup-website" name="website" type="text" tabIndex={-1} autoComplete="off" value={honeypot} onChange={(e) => setHoneypot(e.target.value)} />
+            </div>
+          )}
           {mode === 'signup' && (
             <div className="relative">
               <User className="absolute left-4 top-1/2 -translate-y-1/2 size-5 text-slate-500" />

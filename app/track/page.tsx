@@ -6,6 +6,7 @@ import { ArrowLeft, Search, Loader2, AlertCircle } from 'lucide-react'
 import { BrandLogo } from '@/components/branding'
 import { SiteFooter } from '@/components/site-footer'
 import { TicketTimeline } from '@/components/ticket-timeline'
+import { PostDeliveryRating } from '@/components/track/post-delivery-rating'
 
 type Result =
   | { found: true; ticketId: string; serviceType: string; title: string; status: string; createdAt: string }
@@ -95,6 +96,8 @@ export default function TrackPage() {
             </div>
 
             <TicketTimeline status={result.status} createdAt={result.createdAt} ticketId={result.ticketId} />
+
+            {/delivered|complete|paid/i.test(result.status) && <PostDeliveryRating ticketId={result.ticketId} />}
 
             <p className="mt-6 border-t border-white/10 pt-4 text-xs text-slate-500">Submitted {new Date(result.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} · For details or changes, <a href={`/chat?ticket=${encodeURIComponent(result.ticketId)}`} className="text-cyan-300 underline">continue in Live Chat</a>.</p>
           </div>

@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { readClientProfile, saveClientProfile } from '@/lib/client-profile'
 import type { QuoteSelection } from '@/components/quote-estimator'
 
 export type Track = 'academic' | 'media' | 'systems'
@@ -13,6 +14,11 @@ type Draft = {
   brief: string
   contact: string
   urgency: string
+  clientName: string
+  whatsapp: string
+  university: string
+  department: string
+  deliverables: string[]
   ticketId: string
   sent: boolean
 }
@@ -20,6 +26,8 @@ type Draft = {
 type IntakeContextValue = Draft & {
   hydrated: boolean
   file: File | null
+  files: File[]
+  returningClient: boolean
   error: string
   submitting: boolean
   setTrack: (value: Track) => void
@@ -27,9 +35,16 @@ type IntakeContextValue = Draft & {
   setBrief: (value: string) => void
   setContact: (value: string) => void
   setUrgency: (value: string) => void
+  setClientName: (value: string) => void
+  setWhatsapp: (value: string) => void
+  setUniversity: (value: string) => void
+  setDepartment: (value: string) => void
+  setDeliverables: (value: string[]) => void
   setError: (value: string) => void
   updateQuote: (selection: QuoteSelection) => void
   selectFile: (file: File | null) => void
+  selectFiles: (files: File[]) => void
+  removeFile: (index: number) => void
   dispatch: () => Promise<void>
   reset: () => void
 }
@@ -58,6 +73,11 @@ const defaults: Draft = {
   brief: '',
   contact: '',
   urgency: 'Standard',
+  clientName: '',
+  whatsapp: '',
+  university: '',
+  department: '',
+  deliverables: [],
   ticketId: '',
   sent: false,
 }
@@ -85,9 +105,11 @@ function rememberReferral() {
 export function IntakeProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const [draft, setDraft] = useState<Draft>(defaults)
-  const [file, setFile] = useState<File | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [returningClient, setReturningClient] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const file = files[0] ?? null
 
   useEffect(() => {
     rememberReferral()
@@ -98,10 +120,38 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
         setDraft({ ...defaults, ...saved, quote: { ...defaultQuote, ...saved.quote } })
       }
     } catch {}
-    // Deep links from the service cards preselect a track for this brief.
-    const requested = new URLSearchParams(window.location.search).get('track')
+    // Repeat clients keep their details in this browser only.
+    const profile = readClientProfile()
+    if (profile) {
+      setReturningClient(true)
+      setDraft((current) => ({
+        ...current,
+        clientName: current.clientName || profile.name,
+        whatsapp: current.whatsapp || profile.whatsapp,
+        university: current.university || profile.university,
+        department: current.department || profile.department,
+        contact: current.contact || profile.whatsapp,
+      }))
+    }
+    // Deep links from service cards / agent promo presets preselect the brief.
+    const params = new URLSearchParams(window.location.search)
+    const requested = params.get('track')
     if (requested === 'academic' || requested === 'media' || requested === 'systems') {
       setDraft((current) => ({ ...current, track: requested }))
+    }
+    const categoryPresets: Record<string, Partial<QuoteSelection>> = {
+      code: { category: 'Code Debugging & Architecture Review', track: 'systems', unit: 'hours', low: 210, high: 330 },
+      slides: { category: 'Slide Deck Design', track: 'media', unit: 'slides', low: 144, high: 240 },
+      research: { category: 'Study Guide Prep', track: 'academic', unit: 'modules', low: 108, high: 180 },
+      general: { category: 'Proofreading & Formatting', track: 'academic', unit: 'pages', low: 48, high: 84 },
+    }
+    const preset = categoryPresets[params.get('cat') || '']
+    if (preset) {
+      setDraft((current) => ({
+        ...current,
+        track: preset.track || current.track,
+        quote: { ...current.quote, ...preset },
+      }))
     }
     setHydrated(true)
   }, [])
@@ -121,19 +171,36 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     setDraft((current) => ({ ...current, quote, track: quote.track, urgency: quote.urgency }))
   }, [])
 
-  const selectFile = useCallback((next: File | null) => {
+  const selectFiles = useCallback((next: File[]) => {
     setError('')
-    if (next && next.size > MAX_FILE_BYTES) {
-      setError('That file is over 15 MB. Zip it, compress it, or send it through Live Chat.')
-      setFile(null)
+    if (!next.length) {
+      setFiles([])
       return
     }
-    setFile(next)
+    const accepted = next.filter((item) => item.size <= MAX_FILE_BYTES)
+    const rejected = next.length - accepted.length
+    if (rejected) setError(`${rejected} file${rejected === 1 ? ' was' : 's were'} over 15 MB and skipped. Keep each file under 15 MB.`)
+    if (!accepted.length) return
+    setFiles((current) => {
+      const seen = new Set(current.map((item) => `${item.name}:${item.size}:${item.lastModified}`))
+      return [...current, ...accepted.filter((item) => {
+        const key = `${item.name}:${item.size}:${item.lastModified}`
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })]
+    })
+  }, [])
+
+  const selectFile = useCallback((next: File | null) => selectFiles(next ? [next] : []), [selectFiles])
+
+  const removeFile = useCallback((index: number) => {
+    setFiles((current) => current.filter((_, position) => position !== index))
   }, [])
 
   const dispatch = useCallback(async () => {
     if (submitting) return
-    const { title, brief, contact, quote, track } = draft
+    const { title, brief, contact, quote, track, deliverables, clientName, whatsapp, university, department } = draft
     if (!title.trim() || !brief.trim() || !contact.trim()) {
       setError('A title, brief description and contact detail are required to dispatch your request.')
       return
@@ -141,14 +208,26 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     setSubmitting(true)
     setError('')
     try {
-      let fileUrls = ''
-      if (file) {
+      const fileUrls: string[] = []
+      if (files.length) {
         const supabase = createClient()
-        const path = `intake/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-        const { error: uploadError } = await supabase.storage.from('uploads').upload(path, file, { upsert: false })
-        if (uploadError) throw new Error('Your file could not be uploaded. Try again, or remove it and send it through Live Chat.')
-        fileUrls = supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl
+        for (const item of files) {
+          const path = `intake/${Date.now()}-${item.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
+          const { error: uploadError } = await supabase.storage.from('uploads').upload(path, item, { upsert: false })
+          if (uploadError) throw new Error('A file could not be uploaded. Try again, or remove it and send it through Live Chat.')
+          fileUrls.push(supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl)
+        }
       }
+      const details = [
+        brief.trim(),
+        deliverables.length ? `Deliverables: ${deliverables.join(', ')}` : '',
+        [
+          clientName && `Client: ${clientName}`,
+          whatsapp && `WhatsApp: ${whatsapp}`,
+          university && `University: ${university}`,
+          department && `Department: ${department}`,
+        ].filter(Boolean).join('; '),
+      ].filter(Boolean).join('\n\n')
       const response = await fetch('/api/submissions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -159,24 +238,34 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
           scope: `${quote.volume} ${quote.unit}`,
           urgency: quote.urgency,
           clientContact: contact,
-          briefDetails: `${brief}\n\nConsultation estimate: GHS ${quote.low}–${quote.high}; ${quote.academicLevel}; ${quote.citationAudit ? 'citation audit included' : 'no citation audit'}. Final quote confirmed after review.`,
-          fileUrls,
+          briefDetails: `${details}\n\nConsultation estimate: GHS ${quote.low}–${quote.high}; ${quote.academicLevel}; ${quote.citationAudit ? 'citation audit included' : 'no citation audit'}. Final quote confirmed after review.`,
+          fileUrls: fileUrls.join(','),
           ref: readReferral(),
         }),
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.error || 'We could not send your brief. Please try again.')
+      saveClientProfile({ name: clientName.trim(), whatsapp: whatsapp.trim(), university: university.trim(), department: department.trim() })
+      setReturningClient(true)
       setDraft((current) => ({ ...current, ticketId: data.ticketId || '', sent: true }))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Something went wrong. Please try again.')
     } finally {
       setSubmitting(false)
     }
-  }, [draft, file, submitting])
+  }, [draft, files, submitting])
 
   const reset = useCallback(() => {
-    setDraft(defaults)
-    setFile(null)
+    const profile = readClientProfile()
+    setDraft({
+      ...defaults,
+      clientName: profile?.name ?? '',
+      whatsapp: profile?.whatsapp ?? '',
+      university: profile?.university ?? '',
+      department: profile?.department ?? '',
+      contact: profile?.whatsapp ?? '',
+    })
+    setFiles([])
     setError('')
     try { sessionStorage.removeItem(STORAGE_KEY) } catch {}
   }, [])
@@ -185,6 +274,8 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     ...draft,
     hydrated,
     file,
+    files,
+    returningClient,
     error,
     submitting,
     setTrack: (value) => update('track', value),
@@ -192,12 +283,19 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
     setBrief: (value) => update('brief', value),
     setContact: (value) => update('contact', value),
     setUrgency: (value) => update('urgency', value),
+    setClientName: (value) => update('clientName', value),
+    setWhatsapp: (value) => update('whatsapp', value),
+    setUniversity: (value) => update('university', value),
+    setDepartment: (value) => update('department', value),
+    setDeliverables: (value) => update('deliverables', value),
     setError,
     updateQuote,
     selectFile,
+    selectFiles,
+    removeFile,
     dispatch,
     reset,
-  }), [draft, hydrated, file, error, submitting, update, updateQuote, selectFile, dispatch, reset])
+  }), [draft, hydrated, file, files, returningClient, error, submitting, update, updateQuote, selectFile, selectFiles, removeFile, dispatch, reset])
 
   return <IntakeContext.Provider value={value}>{children}</IntakeContext.Provider>
 }

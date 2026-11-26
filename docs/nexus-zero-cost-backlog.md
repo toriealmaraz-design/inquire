@@ -35,3 +35,10 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 18. Honeypot field + `>3s` minimum submission time on intake and agent registration.
 19. Presigned upload/download URLs with `900s` TTL.
 20. `navigator.onLine` status banner + `localStorage` offline edit queue with auto-sync.
+
+## Implementation status (26 Nov 2026)
+
+- **Shipped:** 1–9, 11–15, 17–18, 20.
+- **Shipped but needs `supabase_setup.sql` re-run:** 16 (`flagged_contacts` table). The API returns an empty list with a warning until the table exists.
+- **Pending:** 10 (two-tier sub-agent override needs new DB columns/tables), 19 (presigned 900s URLs need an R2/private-bucket migration; current app uses public Supabase Storage).
+- **Added dependency:** `qrcode` for real scannable referral posters.

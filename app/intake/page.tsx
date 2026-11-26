@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { ArrowRight, BookOpen, Check, Code2, FileText } from 'lucide-react'
 import { IntakeShell } from '@/components/intake/intake-shell'
+import { ProofSamples } from '@/components/intake/proof-samples'
 import { QuoteEstimator } from '@/components/quote-estimator'
 import { useIntake, type Track } from './provider'
 
@@ -35,6 +36,7 @@ export default function IntakeScopePage() {
       </div>
 
       <QuoteEstimator urgency={urgency} setUrgency={setUrgency} onChange={updateQuote} initial={quote} />
+      <ProofSamples />
 
       <button onClick={() => router.push('/intake/brief')} className="portal-focus mt-8 flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-300 font-bold text-slate-950 transition hover:bg-cyan-200">
         Continue to brief <ArrowRight className="size-4" />

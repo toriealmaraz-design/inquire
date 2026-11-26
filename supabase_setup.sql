@@ -188,6 +188,16 @@ create table if not exists public.testimonials (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.flagged_contacts (
+  id serial primary key,
+  phone varchar(80) not null,
+  phone_key varchar(80) not null unique,
+  reason varchar(120) not null default 'High risk',
+  note text,
+  created_by integer references public.users(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
 -- ---------------------------------------------------------------------------
 -- 2. Ticket-number generator: AC-2610-001 (academic), MD-… (media), IT-… (systems)
 --    Sequence is per (prefix, YYMM). Not stored in the repo — reconstructed here.
@@ -291,7 +301,7 @@ begin
   foreach t in array array[
     'users','settings','conversations','messages','uploads','submissions',
     'announcements','push_subscriptions','staff_accounts','chatbot_replies',
-    'chatbot_misses','notifications','complaints','testimonials','ticket_counters'
+    'chatbot_misses','notifications','complaints','testimonials','flagged_contacts','ticket_counters'
   ] loop
     execute format('alter table if exists public.%I disable row level security', t);
   end loop;
