@@ -1,6 +1,6 @@
 # Nexus zero-cost feature backlog
 
-> **Standing reminder:** `DATABASE_URL` in `.env.local` still points to the old Supabase project `yesqrcbyuktcuneasyzu` while `NEXT_PUBLIC_SUPABASE_URL` points to `zgpesfucwvhupbcqdvky`. Replace it with the current session-pooler connection string before verifying DB-backed work. Never put the credential in chat or repo files.
+> **Database status (resolved 27 Nov 2026):** `.env.local` now uses the `eu-west-1` session pooler for `zgpesfucwvhupbcqdvky`. The file is gitignored — never commit credentials or paste them into repo files. Rotate any secret that has appeared in chat.
 
 All items are intended to run on the existing React/Next.js + Supabase/Postgres + Vercel + R2-style file storage stack at zero additional cost.
 
@@ -36,10 +36,10 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 19. Presigned upload/download URLs with `900s` TTL.
 20. `navigator.onLine` status banner + `localStorage` offline edit queue with auto-sync.
 
-## Implementation status (26 Nov 2026)
+## Implementation status (27 Nov 2026)
 
-- **Shipped:** 1–15, 17–18, 20 (10 now implemented in code).
-- **Shipped but needs `supabase_setup.sql` re-run:** 16 (`flagged_contacts` table) and 10 (`parent_agent_id`, `upline_agent_id`, `revision_count`, `client_signoff_at`, `commission_status`, `override_ghs` plus indexes). APIs degrade safely until the schema exists.
+- **Shipped:** 1–18, 20.
+- **Schema verified live:** `flagged_contacts`, `parent_agent_id`, `upline_agent_id`, `revision_count`, `client_signoff_at`, `commission_status`, `override_ghs`, all three new constraints and all five lookup indexes are present in the connected Supabase project.
 - **Pending:** 19 (presigned 900s URLs need an R2/private-bucket migration; current app uses public Supabase Storage).
 - **Added dependency:** `qrcode` for real scannable referral posters.
 
@@ -49,4 +49,4 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 - **Client:** 4 quick-scope presets layered onto the existing dedicated intake steps, urgency chips, no-login ticket timeline with revision count (0–2), WhatsApp handoff to `0206478727`, explicit client sign-off before `PENDING → AVAILABLE`.
 - **Admin:** split simulator extended with sub-agent override, manual MoMo batch CSV, deadline sorting by remaining hours, file-size caps and retention cleanup.
 - **Quota guardrails:** Neon free plan = 1 GB / 100 CU-hours; R2 free plan = 10 GB / 1M Class A / 10M Class B. Prefer indexed lookups, no server polling loops, 15 MB per-file intake cap, automated retention cleanup. R2 itself is not wired yet — storage is public Supabase Storage, so presigned 900s URLs remain blocked on a storage migration.
-- **Verification:** `tsc --noEmit`, `next build`, and headless-Chrome checks passed for `/`, `/intake`, `/track`, `/chat`, `/auth/signin`; new protected APIs return expected 403/405 unauthenticated. DB-backed flows remain unverified until `.env.local` is corrected.
+- **Verification (27 Nov 2026):** `tsc --noEmit`, `next build`, and headless-Chrome checks passed for `/`, `/intake`, `/track`, `/chat`, `/auth/signin`, `/dashboard`, `/agent/dashboard` with zero exceptions and zero server DB errors. Direct Postgres host was unreachable from this environment, so the session pooler is used. Live checks: `select 1` OK, `/api/testimonials` 200, `/api/chatbot` 200, `/api/ticket?id=…` 200 with revision/sign-off fields, protected APIs 403 unauthenticated. Authenticated dashboards redirect to sign-in as expected without a session.

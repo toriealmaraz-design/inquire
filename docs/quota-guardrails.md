@@ -18,4 +18,4 @@
 
 - Presigned **900s** upload/download URLs require migrating from public Supabase Storage to private Cloudflare R2 with signed API routes.
 - Add a storage-usage dashboard once R2 credentials exist; until then, watch the provider dashboards manually.
-- `DATABASE_URL` must be restored before any DB-backed quota check can be verified.
+- `DATABASE_URL` now points at the `eu-west-1` session pooler for `zgpesfucwvhupbcqdvky`; connectivity and the new schema were verified on 27 Nov 2026. The direct `db.….supabase.co:5432` host is unreachable from this environment, so use the pooler.
