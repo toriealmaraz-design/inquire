@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadStorageFile } from '@/lib/client-upload'
 import { readClientProfile, saveClientProfile } from '@/lib/client-profile'
 import { defaultQuote, quoteFor, type QuoteSelection, type ScopeTrack } from '@/components/intake/pricing'
 import { quoteForPreset, type QuickScopePreset } from '@/components/intake/quick-scope'
@@ -208,10 +209,11 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       if (files.length) {
         const supabase = createClient()
         for (const item of files) {
-          const path = `intake/${Date.now()}-${item.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-          const { error: uploadError } = await supabase.storage.from('uploads').upload(path, item, { upsert: false })
-          if (uploadError) throw new Error('A file could not be uploaded. Try again, or remove it and send it through Live Chat.')
-          fileUrls.push(supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl)
+          try {
+            fileUrls.push(await uploadStorageFile(supabase, item))
+          } catch {
+            throw new Error('A file could not be uploaded. Try again, or remove it and send it through Live Chat.')
+          }
         }
       }
       const details = [

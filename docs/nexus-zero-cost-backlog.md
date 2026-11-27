@@ -38,9 +38,9 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 
 ## Implementation status (27 Nov 2026)
 
-- **Shipped:** 1–18, 20.
+- **Shipped:** 1–20 (19 uses R2 when configured, Supabase otherwise).
 - **Schema verified live:** `flagged_contacts`, `parent_agent_id`, `upline_agent_id`, `revision_count`, `client_signoff_at`, `commission_status`, `override_ghs`, all three new constraints and all five lookup indexes are present in the connected Supabase project.
-- **Pending:** 19 (presigned 900s URLs need an R2/private-bucket migration; current app uses public Supabase Storage).
+- **Shipped with fallback:** 19 (900s presigned R2 PUT/GET via `/api/storage/*`; with no `R2_*` vars the app keeps using public Supabase Storage unchanged).
 - **Added dependency:** `qrcode` for real scannable referral posters.
 
 ## Refined scope (26 Nov 2026, second pass)
@@ -48,5 +48,5 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 - **Sub-agent network:** `?upline=CODE` invite links, self-referential `parent_agent_id`, depth cap 2, anti-loop checks, anonymized roster, `15%` of platform net margin as override (never from specialist/direct-agent cuts), released only after `DELIVERED` + paid + client sign-off.
 - **Client:** 4 quick-scope presets layered onto the existing dedicated intake steps, urgency chips, no-login ticket timeline with revision count (0–2), WhatsApp handoff to `0206478727`, explicit client sign-off before `PENDING → AVAILABLE`.
 - **Admin:** split simulator extended with sub-agent override, manual MoMo batch CSV, deadline sorting by remaining hours, file-size caps and retention cleanup.
-- **Quota guardrails:** Neon free plan = 1 GB / 100 CU-hours; R2 free plan = 10 GB / 1M Class A / 10M Class B. Prefer indexed lookups, no server polling loops, 15 MB per-file intake cap, automated retention cleanup. R2 itself is not wired yet — storage is public Supabase Storage, so presigned 900s URLs remain blocked on a storage migration.
+- **Quota guardrails:** Neon free plan = 1 GB / 100 CU-hours; R2 free plan = 10 GB / 1M Class A / 10M Class B. Prefer indexed lookups, no server polling loops, 15 MB per-file intake cap, automated retention cleanup. R2 is wired behind four server-only env vars; until they are set, storage stays on public Supabase Storage.
 - **Verification (27 Nov 2026):** `tsc --noEmit`, `next build`, and headless-Chrome checks passed for `/`, `/intake`, `/track`, `/chat`, `/auth/signin`, `/dashboard`, `/agent/dashboard` with zero exceptions and zero server DB errors. Direct Postgres host was unreachable from this environment, so the session pooler is used. Live checks: `select 1` OK, `/api/testimonials` 200, `/api/chatbot` 200, `/api/ticket?id=…` 200 with revision/sign-off fields, protected APIs 403 unauthenticated. Authenticated dashboards redirect to sign-in as expected without a session.

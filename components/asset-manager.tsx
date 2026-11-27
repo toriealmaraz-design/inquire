@@ -3,6 +3,7 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { uploadStorageFile } from '@/lib/client-upload'
 import { ImagePlus, Loader2, Check, AlertCircle } from 'lucide-react'
 
 const MAX_ASSET_BYTES = 15 * 1024 * 1024
@@ -21,11 +22,7 @@ export function AssetManager() {
 
     setBusy(kind)
     try {
-      const supabase = createClient()
-      const path = `branding/${kind}-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '-')}`
-      const { error: uploadError } = await supabase.storage.from('site-assets').upload(path, file, { contentType: file.type, upsert: true })
-      if (uploadError) throw uploadError
-      const url = supabase.storage.from('site-assets').getPublicUrl(path).data.publicUrl
+      const url = await uploadStorageFile(createClient(), file, 'site-assets', `${kind}-${file.name}`)
       const response = await fetch('/api/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

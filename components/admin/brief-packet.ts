@@ -12,7 +12,7 @@ export type PacketBrief = DeadlineSource & {
 // Linear, bounded redactions: no nested quantifiers, long runs are capped.
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
 const PHONE_RE = /\+?\d[\d\s().-]{7,18}\d/g
-const URL_RE = /https?:\/\/[^\s,;"'<>]+/gi
+const URL_RE = /https?:\/\/[^\s,;"'<>]+|\/api\/storage\/file\?key=[^\s,;"'<>]+/gi
 const REDACTED = '[contact removed]'
 
 export function stripPersonalContact(text: string) {
@@ -23,7 +23,11 @@ function uploadLinks(raw: string | null | undefined) {
   const links: string[] = []
   for (const match of (raw || '').match(URL_RE) || []) {
     try {
-      const url = new URL(match)
+      // R2-backed links are stored as same-origin paths; make them usable outside the app.
+      const absolute = match.startsWith('/') && typeof window !== 'undefined'
+        ? new URL(match, window.location.origin).toString()
+        : match
+      const url = new URL(absolute)
       if (url.protocol === 'http:' || url.protocol === 'https:') links.push(url.toString())
     } catch {
       // Skip malformed links rather than leaking raw text into the packet.

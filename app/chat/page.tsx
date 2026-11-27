@@ -7,6 +7,8 @@ import { WebCall } from '@/components/web-call'
 import { Lightbox } from '@/components/lightbox'
 import { BrandLogo } from '@/components/branding'
 import { createClient } from '@/lib/supabase/client'
+import { uploadStorageFile } from '@/lib/client-upload'
+import { FILE_LINK_SOURCE, embeddedFileUrl, fileLinkRegex, isFileLink } from '@/lib/storage-link'
 import { previewText } from '@/lib/text'
 import { hasStaff, usePresence } from '@/lib/presence'
 
@@ -67,22 +69,22 @@ const rowToMessage = (r: DbMessage): Message => ({
   reactions: r.reactions ?? null,
 })
 
-// "📎 name\nurl" -> file card
+// "📎 name\nurl" -> file card (absolute Supabase URL or same-origin R2 link)
 function parseFile(text: string) {
-  const m = text.match(/^📎 (.+)\n(https?:\/\/\S+)$/)
+  const m = text.match(new RegExp(`^📎 (.+)\\n(${FILE_LINK_SOURCE})$`))
   return m ? { name: m[1], url: m[2], isImage: /\.(png|jpe?g|gif|webp|avif)$/i.test(m[1]), isAudio: false } : null
 }
 
 function parseAudio(text: string) {
-  const m = text.match(/^🎙️ Voice message\n(https?:\/\/\S+)$/)
-  return m ? { url: m[1] } : null
+  const url = embeddedFileUrl(text, '🎙️ Voice message')
+  return url ? { url } : null
 }
 
 function Linkified({ text }: { text: string }) {
   return (
     <>
-      {text.split(/(https?:\/\/[^\s]+)/g).map((part, i) =>
-        /^https?:\/\//.test(part) ? (
+      {text.split(fileLinkRegex('g')).map((part, i) =>
+        isFileLink(part) ? (
           <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="break-all underline text-cyan-300 hover:text-cyan-200">
             {part}
           </a>
@@ -433,10 +435,7 @@ export default function ChatPage() {
         try {
           const id = await ensureConversation()
           if (!id) throw new Error()
-          const path = `${id}/${Date.now()}-voice-message.webm`
-          const { error: uploadError } = await supabase!.storage.from('uploads').upload(path, blob, { contentType: blob.type, upsert: false })
-          if (uploadError) throw uploadError
-          const url = supabase!.storage.from('uploads').getPublicUrl(path).data.publicUrl
+          const url = await uploadStorageFile(supabase!, blob, 'uploads', 'voice-message.webm')
           await supabase!.from('uploads').insert({ conversation_id: id, file_name: 'Voice message.webm', file_url: url, file_type: blob.type, file_size: blob.size, uploaded_by: 'client' })
           await postMessage(`🎙️ Voice message\n${url}`)
         } catch {
@@ -463,10 +462,7 @@ export default function ChatPage() {
     try {
       const id = await ensureConversation()
       if (!id) throw new Error()
-      const path = `${id}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`
-      const { error: upErr } = await supabase.storage.from('uploads').upload(path, file, { cacheControl: '3600', upsert: false })
-      if (upErr) throw upErr
-      const url = supabase.storage.from('uploads').getPublicUrl(path).data.publicUrl
+      const url = await uploadStorageFile(supabase, file)
       await supabase.from('uploads').insert({
         conversation_id: id,
         file_name: file.name,

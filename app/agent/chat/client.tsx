@@ -4,6 +4,8 @@ import { AnimatedHeading } from '@/components/visual/animated-heading'
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { uploadStorageFile } from '@/lib/client-upload'
+import { FILE_LINK_SOURCE, fileLinkRegex, isFileLink } from '@/lib/storage-link'
 import { previewText } from '@/lib/text'
 import { PushPrompt } from '@/components/push-prompt'
 import { NotificationBell } from '@/components/notification-bell'
@@ -90,14 +92,14 @@ function maskFiles(text: string, admin: boolean) {
 
 // "📎 name\nurl" where url is an image -> {url, name}
 function imageOf(text: string): { url: string; name: string } | null {
-  const m = text.match(/^📎 (.+)\n(https?:\/\/\S+)$/)
+  const m = text.match(new RegExp(`^📎 (.+)\\n(${FILE_LINK_SOURCE})$`))
   return m && /\.(png|jpe?g|gif|webp|avif)$/i.test(m[1]) ? { url: m[2], name: m[1] } : null
 }
 
 function renderContent(text: string) {
-  const parts = text.split(/(https?:\/\/[^\s]+)/g)
+  const parts = text.split(fileLinkRegex('g'))
   return parts.map((part, i) =>
-    /^https?:\/\//.test(part) ? (
+    isFileLink(part) ? (
       <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline break-all text-cyan-300 hover:text-cyan-200">
         {part}
       </a>
@@ -354,15 +356,13 @@ export function AgentChatClient({ user }: { user: User }) {
     if (e.target) e.target.value = ''
     if (!file || !activeConvo || uploading) return
     setUploading(true)
-    const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const path = `${activeConvo}/${Date.now()}-${safeName}`
-    const { error: upErr } = await supabase.storage.from('uploads').upload(path, file, { cacheControl: '3600', upsert: false })
-    if (upErr) {
+    let url: string
+    try {
+      url = await uploadStorageFile(supabase, file)
+    } catch {
       setUploading(false)
       return
     }
-    const { data: pub } = supabase.storage.from('uploads').getPublicUrl(path)
-    const url = pub.publicUrl
     await supabase.from('uploads').insert({
       conversation_id: activeConvo,
       file_name: file.name,

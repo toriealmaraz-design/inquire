@@ -23,6 +23,7 @@ import { WeeklySnapshot } from '@/components/admin/weekly-snapshot'
 import { MomoBatch } from '@/components/admin/momo-batch'
 import { extractDeadline, formatDeadline } from '@/components/admin/deadline'
 import { contactKey } from '@/lib/phone'
+import { isFileLink } from '@/lib/storage-link'
 import { BriefEditor } from '@/components/brief-editor'
 import { ComplaintsInbox } from '@/components/complaints'
 import { ContactSuperAdmin } from '@/components/contact-super-admin'
@@ -746,7 +747,7 @@ export function DashboardClient({ user }: { user: User }) {
                         <BriefEditor brief={s} onClose={() => setEditing(null)} onSaved={(d) => setIntake((rows) => rows.map((r) => (r.id === s.id ? { ...r, ...(d as Partial<IntakeRow>) } : r)))} />
                       )}
                       {s.briefDetails && <details className="mt-2 text-sm text-slate-300"><summary className="cursor-pointer select-none text-xs text-cyan-300 hover:text-cyan-200">Read brief</summary><p className="mt-2 whitespace-pre-wrap leading-6">{s.briefDetails}</p></details>}
-                      {s.fileUrls && /^https?:\/\//.test(s.fileUrls) && (
+                      {s.fileUrls && isFileLink(s.fileUrls) && (
                         <a href={s.fileUrls} target="_blank" rel="noopener noreferrer" download className="mt-3 inline-flex items-center gap-1 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 px-3 py-2 text-xs font-bold text-white hover:from-cyan-400 hover:to-blue-500">
                           <Download className="size-4" /> Download attachment
                         </a>
