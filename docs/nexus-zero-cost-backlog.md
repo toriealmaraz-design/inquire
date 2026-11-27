@@ -52,6 +52,12 @@ All items are intended to run on the existing React/Next.js + Supabase/Postgres 
 - **Handoff summary and standards** provide a printable delivery summary and state the two-round revision limit and the two-hour internal quality assurance buffer.
 - **Database status:** the new nullable columns are added to both the Drizzle schema and `supabase_setup.sql`. Runtime verification remains pending because the current database password fails with `28P01`; no sample or fabricated data has been added.
 
+## Client and agent trust pass (27 Nov 2026)
+
+- **Client:** a verifiable delivery manifest with file links, scope, revision round, quality-assurance sign-off and a timestamped handoff note appears on no-login ticket views. Quote and ticket cards state exactly what is included, the hard two-round revision limit, a realistic completion window and a visible two-hour internal quality-assurance buffer. A confidentiality banner explains anonymized specialist briefs, no public sharing of student files and the support boundary.
+- **Agent:** a verified campus badge ranks Scout, Connector and Campus Lead from paid referrals only. A commission breakdown card traces Quoted, In Progress, Delivered and Cleared, then Paid Out, showing exact GHS amounts and margin-funded two-tier overrides. Separate client and sub-agent campaign cards use the dedicated campaign palette. Payout history shows MoMo references and settlement dates recorded by an administrator.
+- **Verification:** `tsc --noEmit` and `next build` pass. Headless-browser checks show zero JavaScript exceptions on the landing page, all four intake steps, ticket lookup, chat, sign-in and both dashboards. Storage, validation and authorization API checks pass in fallback mode. Database-backed reads remain blocked by the invalid password until the connection string is updated.
+
 ## Refined scope (26 Nov 2026, second pass)
 
 - **Sub-agent network:** `?upline=CODE` invite links, self-referential `parent_agent_id`, depth cap 2, anti-loop checks, anonymized roster, `15%` of platform net margin as override (never from specialist/direct-agent cuts), released only after `DELIVERED` + paid + client sign-off.
