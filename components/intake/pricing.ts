@@ -8,11 +8,11 @@ export type DeadlineOption = {
 }
 
 export const deadlineOptions: DeadlineOption[] = [
-  { value: 'Early Bird (72h+)', short: '72h+', detail: '−10%', multiplier: 0.9, badge: '10% early-bird' },
-  { value: 'Standard', short: '3–5 days', detail: 'Base rate', multiplier: 1 },
-  { value: '48-Hour', short: '48 hours', detail: '+10%', multiplier: 1.1 },
-  { value: '24-Hour Priority', short: '24 hours', detail: '+25%', multiplier: 1.25 },
-  { value: 'Emergency (<6h)', short: '<6 hours', detail: '×1.5', multiplier: 1.5, badge: '×1.5 emergency surcharge' },
+  { value: 'Early Bird (72h+)', short: 'More than 72 hours', detail: 'Ten percent less', multiplier: 0.9, badge: 'Ten percent early booking saving' },
+  { value: 'Standard', short: 'Three to five days', detail: 'Standard rate', multiplier: 1 },
+  { value: '48-Hour', short: '48 hours', detail: 'Ten percent more', multiplier: 1.1 },
+  { value: '24-Hour Priority', short: '24 hours', detail: 'Twenty-five percent more', multiplier: 1.25 },
+  { value: 'Emergency (<6h)', short: 'Under 6 hours', detail: 'Fifty percent more', multiplier: 1.5, badge: 'Fifty percent emergency surcharge' },
 ]
 
 export function deadlineFor(value: string): DeadlineOption {
@@ -43,11 +43,11 @@ export type QuoteCategory = {
 }
 
 export const quoteCategories: QuoteCategory[] = [
-  { id: 'proofreading', title: 'Proofreading & Formatting', track: 'academic', unit: 'pages', lowRate: 8, highRate: 14 },
-  { id: 'code-debugging', title: 'Code Debugging & Architecture Review', track: 'systems', unit: 'hours', lowRate: 35, highRate: 55 },
+  { id: 'proofreading', title: 'Proofreading and Formatting', track: 'academic', unit: 'pages', lowRate: 8, highRate: 14 },
+  { id: 'code-debugging', title: 'Code Debugging and Architecture Review', track: 'systems', unit: 'hours', lowRate: 35, highRate: 55 },
   { id: 'data-analysis', title: 'Data Analysis Walkthrough', track: 'systems', unit: 'hours', lowRate: 30, highRate: 48 },
   { id: 'slide-design', title: 'Slide Deck Design', track: 'media', unit: 'slides', lowRate: 12, highRate: 20 },
-  { id: 'study-guides', title: 'Study Guide Prep', track: 'academic', unit: 'modules', lowRate: 18, highRate: 30 },
+  { id: 'study-guides', title: 'Study Guide Preparation', track: 'academic', unit: 'modules', lowRate: 18, highRate: 30 },
 ]
 
 export const academicLevels = ['Diploma', 'Undergraduate', 'Masters', 'Doctoral']
@@ -84,7 +84,7 @@ export function quoteFor(input: Partial<QuoteSelection> & { category: string }):
 }
 
 export const defaultQuote = quoteFor({
-  category: 'Proofreading & Formatting',
+  category: 'Proofreading and Formatting',
   academicLevel: 'Undergraduate',
   volume: 6,
   urgency: 'Standard',

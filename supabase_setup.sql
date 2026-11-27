@@ -109,6 +109,14 @@ create table if not exists public.submissions (
   override_ghs numeric(10,2),
   assigned_at timestamp,
   paid_at timestamp,
+  handoff_note text,
+  handoff_at timestamp,
+  qa_checklist jsonb,
+  qa_signed_off_at timestamp,
+  specialist_fee_ghs numeric(10,2),
+  quote_net_margin_ghs numeric(10,2),
+  payout_reference varchar(120),
+  settlement_date timestamp,
   created_at timestamp default now()
 );
 
@@ -195,6 +203,18 @@ alter table public.submissions add column if not exists revision_count integer n
 alter table public.submissions add column if not exists client_signoff_at timestamp;
 alter table public.submissions add column if not exists commission_status varchar(20) not null default 'PENDING';
 alter table public.submissions add column if not exists override_ghs numeric(10,2);
+
+-- Specialist handoff, pre-delivery quality assurance and quote guardrail fields.
+-- payout_reference / settlement_date are written by the admin payout-batch API
+-- (owned separately); no constraints are added so existing rows stay valid.
+alter table public.submissions add column if not exists handoff_note text;
+alter table public.submissions add column if not exists handoff_at timestamp;
+alter table public.submissions add column if not exists qa_checklist jsonb;
+alter table public.submissions add column if not exists qa_signed_off_at timestamp;
+alter table public.submissions add column if not exists specialist_fee_ghs numeric(10,2);
+alter table public.submissions add column if not exists quote_net_margin_ghs numeric(10,2);
+alter table public.submissions add column if not exists payout_reference varchar(120);
+alter table public.submissions add column if not exists settlement_date timestamp;
 
 do $$
 begin
@@ -347,7 +367,7 @@ begin
   end loop;
 end $$;
 
--- Make sure the single settings row exists (branding, VAPID keys, commission %, etc.)
+-- Make sure the single settings row exists (branding, VAPID keys, commission percentage, and more)
 insert into public.settings (id) values (1) on conflict (id) do nothing;
 
 -- ============================================================================

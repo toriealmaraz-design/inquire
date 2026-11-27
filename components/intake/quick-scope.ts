@@ -15,19 +15,19 @@ export type QuickScopePreset = {
 
 export const quickScopePresets: QuickScopePreset[] = [
   {
-    id: 'code-fix', label: 'Code Fix / Script', hint: 'Debug or write a script', cat: 'code',
-    category: 'Code Debugging & Architecture Review', academicLevel: 'Undergraduate', volume: 4, urgency: '24-Hour Priority', citationAudit: false,
+    id: 'code-fix', label: 'Code repair or script', hint: 'Debug or write a script', cat: 'code',
+    category: 'Code Debugging and Architecture Review', academicLevel: 'Undergraduate', volume: 4, urgency: '24-Hour Priority', citationAudit: false,
   },
   {
-    id: 'research', label: 'Research & Formatting', hint: 'Sources, structure, citations', cat: 'general',
-    category: 'Proofreading & Formatting', academicLevel: 'Undergraduate', volume: 8, urgency: 'Standard', citationAudit: true,
+    id: 'research', label: 'Research and Formatting', hint: 'Sources, structure, citations', cat: 'general',
+    category: 'Proofreading and Formatting', academicLevel: 'Undergraduate', volume: 8, urgency: 'Standard', citationAudit: true,
   },
   {
-    id: 'slides', label: 'Slide Deck / Visuals', hint: 'Presentation-ready slides', cat: 'slides',
+    id: 'slides', label: 'Slide deck and visuals', hint: 'Presentation-ready slides', cat: 'slides',
     category: 'Slide Deck Design', academicLevel: 'Undergraduate', volume: 10, urgency: '48-Hour', citationAudit: false,
   },
   {
-    id: 'system', label: 'System / Web Task', hint: 'Hands-on technical help', cat: 'system',
+    id: 'system', label: 'System or web task', hint: 'Hands-on technical help', cat: 'system',
     category: 'Data Analysis Walkthrough', academicLevel: 'Undergraduate', volume: 5, urgency: 'Standard', citationAudit: false,
   },
 ]

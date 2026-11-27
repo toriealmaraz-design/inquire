@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import { Network } from 'lucide-react'
 import { AnimatedHeading } from '@/components/visual/animated-heading'
 
-type Roster = {
+export type SubagentSummary = {
   subAgentCount: number
   activeThisWeek: number
   totalOverrideGhs: number
@@ -15,21 +14,7 @@ type Roster = {
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
 
 /** Read-only, pseudonymous roster — no client, phone or email data is requested. */
-export function SubagentRoster() {
-  const [roster, setRoster] = useState<Roster | null>(null)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    fetch('/api/agent/subagents')
-      .then(async (r) => {
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok) throw new Error(data.error || 'Could not load your roster.')
-        return data as Roster
-      })
-      .then(setRoster)
-      .catch((e) => setError(e instanceof Error ? e.message : 'Could not load your roster.'))
-  }, [])
-
+export function SubagentRoster({ roster, error }: { roster: SubagentSummary | null; error: string }) {
   return (
     <section className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`} aria-label="Sub-agent roster">
       <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><Network className="size-4 text-violet-300" /> My sub-agents</AnimatedHeading>

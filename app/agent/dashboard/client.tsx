@@ -14,7 +14,12 @@ import { QrPosterButton } from '@/components/agent/qr-poster'
 import { PromoLinks } from '@/components/agent/promo-links'
 import { PayoutHistory, type Payout } from '@/components/agent/payout-history'
 import { AgentStreak } from '@/components/agent/streak-tracker'
-import { SubagentRoster } from '@/components/agent/subagent-roster'
+import { SubagentRoster, type SubagentSummary } from '@/components/agent/subagent-roster'
+import { VerifiedTierCard } from '@/components/agent/verified-tier-card'
+import { VerifiedNetwork } from '@/components/agent/verified-network'
+import { CommissionBreakdown } from '@/components/agent/commission-breakdown'
+import { CampaignCards } from '@/components/agent/campaign-cards'
+import type { CommissionStage } from '@/lib/commission'
 
 type User = {
   id?: string
@@ -32,6 +37,8 @@ type Earnings = {
   assignedCount: number
   referred: number
   paidCount: number
+  paidReferralCount: number
+  paidReferralTotalGhs: number
   totalEarned: number
   pendingEarnings: number
   items: {
@@ -44,8 +51,13 @@ type Earnings = {
     urgency: string | null
     briefDetails: string | null
     status: string | null
+    commissionStatus: string | null
+    stage: CommissionStage
+    clientSignoffAt: string | null
     priceGhs: string | null
     myCommission: number
+    directCommissionGhs: number
+    overrideGhs: number
     assignedToMe: boolean
     referredByMe: boolean
     paidAt: string | null
@@ -62,7 +74,11 @@ export function AgentDashboardClient({ user }: { user: User }) {
   const [supabase] = useState(() => createClient())
   const [earnings, setEarnings] = useState<Earnings | null>(null)
   const [earningsError, setEarningsError] = useState('')
+  const [earningsLoading, setEarningsLoading] = useState(true)
+  const [payoutsLoading, setPayoutsLoading] = useState(true)
   const [payoutData, setPayoutData] = useState<{ payouts: Payout[]; totalPaidGhs: number; overridePaidGhs: number } | null>(null)
+  const [roster, setRoster] = useState<SubagentSummary | null>(null)
+  const [rosterError, setRosterError] = useState('')
   const [copied, setCopied] = useState(false)
   const [uplineCopied, setUplineCopied] = useState(false)
   const [origin, setOrigin] = useState('')
@@ -85,6 +101,7 @@ export function AgentDashboardClient({ user }: { user: User }) {
         setEarnings(data)
       })
       .catch((e) => setEarningsError(e instanceof Error ? e.message : 'Could not load your referral link.'))
+      .finally(() => setEarningsLoading(false))
 
     fetch('/api/agent/payouts')
       .then(async (r) => {
@@ -94,6 +111,15 @@ export function AgentDashboardClient({ user }: { user: User }) {
       })
       .then((data) => setPayoutData({ payouts: data.payouts || [], totalPaidGhs: Number(data.totalPaidGhs || 0), overridePaidGhs: Number(data.overridePaidGhs || 0) }))
       .catch(() => setPayoutData({ payouts: [], totalPaidGhs: 0, overridePaidGhs: 0 }))
+      .finally(() => setPayoutsLoading(false))
+
+    fetch('/api/agent/subagents')
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(data.error || 'Could not load your roster.')
+        setRoster(data as SubagentSummary)
+      })
+      .catch((e) => setRosterError(e instanceof Error ? e.message : 'Could not load your roster.'))
   }, [])
 
   const referralLink = earnings && origin ? `${origin}/?ref=${earnings.referralCode}` : ''
@@ -200,11 +226,24 @@ export function AgentDashboardClient({ user }: { user: User }) {
               <Wallet className="size-4 text-emerald-300" />
             </div>
             <p className="mt-4 text-2xl font-bold">GHS {(earnings?.totalEarned ?? 0).toFixed(2)}</p>
-            <p className="mt-1 text-[11px] leading-4 text-slate-500">Cleared paid referrals &amp; assignments</p>
+            <p className="mt-1 text-[11px] leading-4 text-slate-500">Cleared paid referrals and assignments</p>
           </div>
           <AgentStreak payouts={payoutData?.payouts ?? null} />
         </div>
 
+        <VerifiedTierCard
+          paidReferralCount={earnings?.paidReferralCount ?? 0}
+          paidReferralGhs={earnings?.paidReferralTotalGhs ?? 0}
+          loading={earningsLoading}
+          error={earningsError}
+        />
+        <VerifiedNetwork
+          paidReferralCount={earnings?.paidReferralCount ?? 0}
+          activeSubAgents={roster?.activeThisWeek ?? 0}
+          totalPaidGhs={payoutData?.totalPaidGhs ?? 0}
+          loading={earningsLoading || payoutsLoading || (!roster && !rosterError)}
+          error={earningsError}
+        />
 
         {/* Referral link + commission */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
@@ -272,7 +311,11 @@ export function AgentDashboardClient({ user }: { user: User }) {
           </p>
         </div>
 
-        <SubagentRoster />
+        <SubagentRoster roster={roster} error={rosterError} />
+
+        <div className="mt-6">
+          <CampaignCards clientLink={referralLink} subAgentLink={inviteLink} />
+        </div>
 
         {/* Assignments (from admins) */}
         <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
@@ -303,6 +346,20 @@ export function AgentDashboardClient({ user }: { user: User }) {
             </ul>
           )}
         </div>
+
+        <CommissionBreakdown
+          items={earnings?.items ?? []}
+          overridePaidGhs={payoutData?.overridePaidGhs ?? 0}
+          loading={earningsLoading}
+          error={earningsError}
+        />
+
+        <details className={`${glass} mt-6 rounded-2xl p-5 text-sm text-slate-300`}>
+          <summary className="cursor-pointer font-bold text-cyan-200">How your commission is calculated</summary>
+          <p className="mt-3 text-xs leading-6 text-slate-400">
+            When a classmate submits a brief through your referral link and pays for the finished job, the direct commission shown on that ticket is yours. A ticket is only Paid Out after payment is recorded; Delivered &amp; Cleared means delivery was confirmed and the commission is ready for payout. If you invited a sub-agent, an upline override can be earned from that job, but only out of the Gemini Nexus platform margin. It never comes out of the specialist&apos;s pay or the referring agent&apos;s direct commission.
+          </p>
+        </details>
 
         <PayoutHistory
           payouts={payoutData?.payouts ?? null}

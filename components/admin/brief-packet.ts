@@ -11,12 +11,28 @@ export type PacketBrief = DeadlineSource & {
 
 // Linear, bounded redactions: no nested quantifiers, long runs are capped.
 const EMAIL_RE = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi
-const PHONE_RE = /\+?\d[\d\s().-]{7,18}\d/g
+// A candidate is only redacted when it actually contains a phone-length run of
+// digits, so dates, deadlines and short technical specifications stay intact.
+const PHONE_CANDIDATE_RE = /\+?\d[\d\s().-]{7,22}\d/g
+const REFERRAL_RE = /(?:\b(?:referral|referrer|upline|referred\s+by|agent)\s*(?:code|label|id)?\s*[:=#]\s*|\b(?:referral|referrer|upline|referred\s+by|agent\s+(?:code|label|id))\s+|[?&]ref=)[A-Za-z0-9@._-]{2,24}\b/gi
+// Case-sensitive so ordinary phrases like "agent required" stay untouched.
+const AGENT_LABEL_RE = /\b(?:Agent|Upline)\s+[A-Z][A-Za-z0-9]{2,24}\b/g
+const COMMISSION_RE = /(\b(?:commission|override|specialist\s+fee|agent\s+cut|payout)\b[^.\n]{0,40}?)(?:(?:GHS|GH¢|₵)\s*)?(\d[\d,]*(?:\.\d{1,2})?)\s*%?/gi
 const URL_RE = /https?:\/\/[^\s,;"'<>]+|\/api\/storage\/file\?key=[^\s,;"'<>]+/gi
 const REDACTED = '[contact removed]'
+const REFERRAL_REMOVED = '[referral removed]'
+const AMOUNT_REMOVED = '[amount removed]'
 
 export function stripPersonalContact(text: string) {
-  return text.replace(EMAIL_RE, REDACTED).replace(PHONE_RE, REDACTED)
+  return text
+    .replace(EMAIL_RE, REDACTED)
+    .replace(PHONE_CANDIDATE_RE, (match) => {
+      const digits = match.replace(/\D/g, '')
+      return digits.length >= 9 && digits.length <= 15 ? REDACTED : match
+    })
+    .replace(REFERRAL_RE, REFERRAL_REMOVED)
+    .replace(AGENT_LABEL_RE, REFERRAL_REMOVED)
+    .replace(COMMISSION_RE, (_match, prefix: string) => `${prefix}${AMOUNT_REMOVED}`)
 }
 
 function uploadLinks(raw: string | null | undefined) {
@@ -36,6 +52,8 @@ function uploadLinks(raw: string | null | undefined) {
   return [...new Set(links)]
 }
 
+const SPECIALIST_FOOTER = 'Specialist brief only. Client contact and referral details are removed. Support is limited to structuring, debugging, formatting and study guidance.'
+
 export function buildBriefPacket(brief: PacketBrief) {
   const deadline = extractDeadline(brief)
   const lines = [
@@ -51,11 +69,14 @@ export function buildBriefPacket(brief: PacketBrief) {
     `- Service: ${stripPersonalContact(brief.serviceType || 'Not specified')}`,
     `- Scope: ${stripPersonalContact(brief.scope || 'Not specified')}`,
     `- Brief: ${stripPersonalContact(brief.title || brief.briefDetails || 'Not specified')}`,
-    '',
-    '## Upload links (R2 / Supabase)',
   ]
+  if (brief.briefDetails && brief.title) {
+    lines.push(`- Technical and academic specifications: ${stripPersonalContact(brief.briefDetails)}`)
+  }
+  lines.push('', '## Upload links (R2 / Supabase)')
   const links = uploadLinks(brief.fileUrls)
   lines.push(...(links.length ? links.map((link) => `- ${link}`) : ['- None attached']))
+  lines.push('', SPECIALIST_FOOTER)
   return `${lines.join('\n')}\n`
 }
 

@@ -11,6 +11,10 @@ export type DeadlineSource = {
   urgency?: string | null
   briefDetails?: string | null
   paidAt?: string | null
+  status?: string | null
+  assignedAt?: string | null
+  /** Plain-language flag computed by /api/submissions GET; no polling required. */
+  staleFlag?: string | null
 }
 
 export function parseDate(value: unknown): number | null {

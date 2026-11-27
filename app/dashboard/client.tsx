@@ -17,6 +17,9 @@ import { RoleWatcher } from '@/components/role-watcher'
 import { AnalyticsBoard } from '@/components/analytics-board'
 import { AgingBadge } from '@/components/admin/aging-badge'
 import { downloadBriefPacket } from '@/components/admin/brief-packet'
+import { DeliverySummary } from '@/components/admin/delivery-summary'
+import { FollowUpNoteButton } from '@/components/admin/follow-up-note'
+import { QaChecklist } from '@/components/admin/qa-checklist'
 import { FlaggedContacts, type Flag } from '@/components/admin/flagged-contacts'
 import { MarginSimulator } from '@/components/admin/margin-simulator'
 import { WeeklySnapshot } from '@/components/admin/weekly-snapshot'
@@ -118,6 +121,16 @@ type IntakeRow = {
   clientSignoffAt?: string | null
   commissionStatus?: string | null
   overrideGhs?: string | null
+  assignedAt?: string | null
+  handoffNote?: string | null
+  handoffAt?: string | null
+  qaChecklist?: unknown
+  qaSignedOffAt?: string | null
+  specialistFeeGhs?: string | null
+  quoteNetMarginGhs?: string | null
+  payoutReference?: string | null
+  settlementDate?: string | null
+  staleFlag?: string | null
   deadline?: string | null
   dueAt?: string | null
 }
@@ -162,6 +175,8 @@ export function DashboardClient({ user }: { user: User }) {
   const [handles, setHandles] = useState({ whatsapp: '', telegram: '', instagram: '', snapchat: '', email: '' })
   const [settingsError, setSettingsError] = useState('')
   const [priceDraft, setPriceDraft] = useState<Record<number, string>>({})
+  const [specialistDraft, setSpecialistDraft] = useState<Record<number, string>>({})
+  const [marginDraft, setMarginDraft] = useState<Record<number, string>>({})
   const [payingId, setPayingId] = useState<number | null>(null)
   const [staff, setStaff] = useState<{ id: number; name: string; role: string | null; field: string | null }[]>([])
   const [agentDraft, setAgentDraft] = useState<Record<number, string>>({})
@@ -565,6 +580,22 @@ export function DashboardClient({ user }: { user: User }) {
                 </div>
               )}
               {(isSuperAdmin || isSubAdmin) && <div className="mt-5"><MomoBatch /></div>}
+              {(isSuperAdmin || isSubAdmin) && (
+                <section className={`${glass} mt-5 rounded-3xl p-5 sm:p-6`} aria-label="Operations standards">
+                  <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#00F0FF]">Standards</p>
+                  <AnimatedHeading as="h2" className="mt-1 text-base font-bold">Operations standards</AnimatedHeading>
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-bold text-[#F8FAFC]">Revision limit</p>
+                      <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Two revision rounds are included per ticket. Further changes are handled in WhatsApp after the client signs off.</p>
+                    </div>
+                    <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <p className="text-xs font-bold text-[#F8FAFC]">Internal quality assurance buffer</p>
+                      <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Two hours are reserved before delivery for checks, formatting and a final link review. Delivery is blocked until the checklist is signed off.</p>
+                    </div>
+                  </div>
+                </section>
+              )}
               <AnalyticsBoard onNavigate={(t) => nav.includes(t) && setTab(t)} />
             </>
           )}
@@ -717,17 +748,27 @@ export function DashboardClient({ user }: { user: User }) {
                           <p className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
                             <span className="font-mono text-cyan-300/80">{s.ticketId}</span> · {s.serviceType}
                             <AgingBadge brief={s} />
+                            <FollowUpNoteButton ticketId={s.ticketId} staleFlag={s.staleFlag} title={briefTitle(s)} />
                             {deadlineSort && !s.paidAt && (() => {
                               const ts = extractDeadline(s)
                               if (ts === null) return null
                               const hours = Math.ceil((ts - Date.now()) / 3_600_000)
                               const tone = hours < 3 ? 'bg-rose-400/15 text-rose-200' : hours < 12 ? 'bg-amber-300/15 text-amber-200' : 'bg-emerald-300/15 text-emerald-200'
-                              return <span title={formatDeadline(ts)} className={`rounded-full px-2 py-0.5 text-[10px] ${tone}`}>{hours < 0 ? 'overdue' : `${hours}h left`}</span>
+                              const amount = Math.max(1, Math.abs(hours))
+                              const phrase = hours < 0
+                                ? `Overdue by ${amount} ${amount === 1 ? 'hour' : 'hours'}`
+                                : `${amount} ${amount === 1 ? 'hour' : 'hours'} left`
+                              return <span title={formatDeadline(ts)} className={`rounded-full px-2 py-0.5 text-[10px] ${tone}`}>{phrase}</span>
                             })()}
                           </p>
                         </div>
                         <span className="flex items-center gap-2">
                           <span className={`rounded-full px-2 py-0.5 text-[11px] ${s.paidAt ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>{s.status || 'Pending Quote'}</span>
+                          {(!!s.paidAt || /delivered|complete|paid/i.test(s.status || '')) && s.qaSignedOffAt && (
+                            <span title={fmtTime(s.qaSignedOffAt)} className="rounded-full bg-emerald-300/10 px-2 py-0.5 text-[10px] text-emerald-200">
+                              Quality assurance signed off {fmtTime(s.qaSignedOffAt)}
+                            </span>
+                          )}
                           <button onClick={() => downloadBriefPacket(s)} title="Download sanitized specialist packet" aria-label={`Packet for ${s.ticketId}`} className="rounded-lg border border-cyan-300/25 bg-cyan-300/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200 hover:border-cyan-300/60 hover:text-cyan-100">Packet</button>
                           {isSuperAdmin && (
                             <>
@@ -752,6 +793,19 @@ export function DashboardClient({ user }: { user: User }) {
                           <Download className="size-4" /> Download attachment
                         </a>
                       )}
+                      <details className="mt-3">
+                        <summary className="cursor-pointer select-none text-xs text-cyan-300 hover:text-cyan-200">Handoff summary</summary>
+                        <div className="mt-2"><DeliverySummary brief={s} /></div>
+                      </details>
+                      {!!s.assignedTo && !s.paidAt && (
+                        <QaChecklist
+                          briefId={s.id}
+                          checklist={s.qaChecklist}
+                          signedOffAt={s.qaSignedOffAt}
+                          handoffNote={s.handoffNote}
+                          onSaved={(data) => setIntake((rows) => rows.map((r) => (r.id === s.id ? { ...r, ...(data as Partial<IntakeRow>) } : r)))}
+                        />
+                      )}
                       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/10 pt-3 text-xs">
                         <span className="text-slate-400">
                           {s.referrerName ? <>Referred by <strong className="text-cyan-200">{s.referrerName}</strong></> : 'No referral'}
@@ -774,9 +828,9 @@ export function DashboardClient({ user }: { user: User }) {
                             <button
                               onClick={() => updateBrief(s.id, { action: 'revision' })}
                               disabled={payingId === s.id || (s.revisionCount ?? 0) >= 2 || !!s.clientSignoffAt}
-                              title="Increment the client revision count (max 2)"
+                              title="Increment the client revision count; the limit is two rounds"
                               className="h-8 rounded-lg border border-white/10 px-2 text-[11px] text-slate-300 hover:border-cyan-300/40 disabled:opacity-50"
-                            >Revision {s.revisionCount ?? 0}/2</button>
+                            >Revision {s.revisionCount ?? 0} of 2</button>
                           </span>
                         ) : (
                           <span className="ml-auto flex flex-wrap items-center gap-2">
@@ -805,17 +859,51 @@ export function DashboardClient({ user }: { user: User }) {
                               aria-label={`Job price for ${s.ticketId}`}
                               className="h-9 w-28 rounded-lg border border-white/10 bg-white/10 px-2 text-white outline-none focus:border-cyan-500/50"
                             />
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="Specialist fee GHS"
+                              value={specialistDraft[s.id] ?? (s.specialistFeeGhs ? String(Number(s.specialistFeeGhs)) : '')}
+                              onChange={(e) => setSpecialistDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                              aria-label={`Specialist fee for ${s.ticketId}`}
+                              className="h-9 w-32 rounded-lg border border-white/10 bg-white/10 px-2 text-white outline-none focus:border-cyan-500/50"
+                            />
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              inputMode="decimal"
+                              placeholder="Net margin GHS"
+                              value={marginDraft[s.id] ?? (s.quoteNetMarginGhs ? String(Number(s.quoteNetMarginGhs)) : '')}
+                              onChange={(e) => setMarginDraft((d) => ({ ...d, [s.id]: e.target.value }))}
+                              aria-label={`Quote net margin for ${s.ticketId}`}
+                              className="h-9 w-32 rounded-lg border border-white/10 bg-white/10 px-2 text-white outline-none focus:border-cyan-500/50"
+                            />
                             <button
                               onClick={() => updateBrief(s.id, {
                                 action: 'assign',
                                 assignedTo: Number(agentDraft[s.id] ?? s.assignedTo),
                                 priceGhs: Number(priceDraft[s.id] ?? s.priceGhs),
+                                ...(specialistDraft[s.id] ? { specialistFeeGhs: Number(specialistDraft[s.id]) } : {}),
+                                ...(marginDraft[s.id] ? { quoteNetMarginGhs: Number(marginDraft[s.id]) } : {}),
                               })}
                               disabled={payingId === s.id || !(agentDraft[s.id] ?? s.assignedTo) || !(priceDraft[s.id] ?? s.priceGhs)}
                               className="h-9 rounded-lg bg-cyan-500/20 px-3 font-bold text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
                             >
                               {s.assignedTo ? 'Update' : 'Assign'}
                             </button>
+                            {!!s.assignedTo && !/delivered|complete/i.test(s.status || '') && (
+                              <button
+                                onClick={() => updateBrief(s.id, { action: 'deliver' })}
+                                disabled={payingId === s.id}
+                                title="Requires all four quality-assurance checks and sign-off"
+                                className="h-9 rounded-lg border border-[#00F0FF]/30 px-3 font-bold text-[#00F0FF] hover:bg-[#00F0FF]/10 disabled:opacity-50"
+                              >
+                                Mark delivered
+                              </button>
+                            )}
                             {s.assignedTo && (isSuperAdmin || isLeadUser) && (
                               <button
                                 onClick={() => window.confirm(`Mark ${s.ticketId} as paid? Commission becomes earned and the job is locked.`) && updateBrief(s.id, { action: 'paid' })}

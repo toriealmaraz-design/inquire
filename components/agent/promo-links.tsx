@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Check, Copy, Link2 } from 'lucide-react'
 
 const PRESETS = [
-  { cat: 'code', label: 'Code', hint: 'Programming & systems' },
-  { cat: 'slides', label: 'Slides', hint: 'Presentations & decks' },
+  { cat: 'code', label: 'Code', hint: 'Programming and systems' },
+  { cat: 'slides', label: 'Slides', hint: 'Presentations and decks' },
   { cat: 'research', label: 'Research', hint: 'Academic research' },
   { cat: 'general', label: 'General', hint: 'Everything else' },
 ] as const

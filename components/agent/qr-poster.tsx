@@ -31,7 +31,7 @@ function loadImage(src: string) {
   return new Promise<HTMLImageElement>((resolve, reject) => {
     const image = new Image()
     image.onload = () => resolve(image)
-    image.onerror = () => reject(new Error('Could not draw the QR code.'))
+    image.onerror = () => reject(new Error('Could not draw the Quick Response code.'))
     image.src = src
   })
 }
@@ -120,7 +120,7 @@ async function buildPoster(link: string, code: string, name: string) {
   ctx.stroke()
   ctx.font = 'bold 30px ui-monospace, monospace'
   ctx.fillStyle = CYAN
-  ctx.fillText(`REF ${code}`, 104, 1491)
+  ctx.fillText(`REFERENCE ${code}`, 104, 1491)
   ctx.font = '22px ui-monospace, monospace'
   ctx.fillStyle = '#B9C7CE'
   ctx.fillText(fitText(ctx, link.replace(/^https?:\/\//, ''), 530), 370, 1490)
@@ -164,8 +164,8 @@ export function QrPosterButton({ link, code, name }: { link: string; code: strin
         <div className="flex h-28 w-20 items-center justify-center rounded-lg border border-white/10 bg-white/5 text-cyan-300/60"><QrCode className="size-6" /></div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-white">QR referral poster</p>
-        <p className="mt-1 text-[11px] leading-5 text-slate-500">Scan-ready PNG flyer (1080 × 1620) with your referral code {code}.</p>
+        <p className="text-sm font-semibold text-white">Quick Response referral poster</p>
+        <p className="mt-1 text-[11px] leading-5 text-slate-500">Scan-ready poster image (1080 × 1620) with your referral code {code}.</p>
         <button
           type="button"
           onClick={download}

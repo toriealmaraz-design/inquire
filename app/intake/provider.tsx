@@ -131,11 +131,11 @@ export function IntakeProvider({ children }: { children: ReactNode }) {
       setDraft((current) => ({ ...current, track: requested }))
     }
     const categoryPresets: Record<string, Partial<QuoteSelection>> = {
-      code: { category: 'Code Debugging & Architecture Review', track: 'systems' },
+      code: { category: 'Code Debugging and Architecture Review', track: 'systems' },
       slides: { category: 'Slide Deck Design', track: 'media' },
-      research: { category: 'Study Guide Prep', track: 'academic' },
+      research: { category: 'Study Guide Preparation', track: 'academic' },
       system: { category: 'Data Analysis Walkthrough', track: 'systems' },
-      general: { category: 'Proofreading & Formatting', track: 'academic' },
+      general: { category: 'Proofreading and Formatting', track: 'academic' },
     }
     const preset = categoryPresets[params.get('cat') || '']
     if (preset) {

@@ -44,6 +44,8 @@ export async function POST(request: Request) {
         revisionCount: submissions.revisionCount,
         clientSignoffAt: submissions.clientSignoffAt,
         commissionStatus: submissions.commissionStatus,
+        qaChecklist: submissions.qaChecklist,
+        qaSignedOffAt: submissions.qaSignedOffAt,
       })
       .from(submissions)
       .where(sql`replace(upper(${submissions.ticketId}), '-', '') = ${normTicket(ticketId)}`)
@@ -52,6 +54,12 @@ export async function POST(request: Request) {
 
     const delivered = Boolean(row.paidAt) || /delivered|complete|paid/i.test(row.status || '')
     if (!delivered) return NextResponse.json({ error: 'Delivery is not confirmed for this ticket yet.' }, { status: 409 })
+    // Tickets created after the checklist rollout cannot be signed off by the
+    // client until internal quality assurance is signed off. Older tickets have
+    // no checklist and keep working unchanged.
+    if (row.qaChecklist && !row.qaSignedOffAt) {
+      return NextResponse.json({ error: 'Internal quality assurance is not signed off for this ticket yet.' }, { status: 409 })
+    }
     if (contactKey(row.clientContact) !== contact) {
       return NextResponse.json({ error: 'That contact does not match this ticket.' }, { status: 403 })
     }

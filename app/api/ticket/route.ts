@@ -3,10 +3,15 @@ import { sql } from 'drizzle-orm'
 import { db } from '@/lib/db'
 import { submissions } from '@/lib/db/schema'
 import { briefTitle, normTicket, TICKET_RE } from '@/lib/fields'
+import { completionWindow, MAX_REVISIONS, parseFileLinks, scopeSummaryFor } from '@/components/intake/trust-terms'
 
 export const runtime = 'nodejs'
 
-const MAX_REVISIONS = 2
+const asIso = (value: unknown): string | null => {
+  if (!value) return null
+  const date = value instanceof Date ? value : new Date(String(value))
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
 
 // Public: status of a brief by ticket number. Returns no client contact details.
 export async function GET(request: Request) {
@@ -18,13 +23,20 @@ export async function GET(request: Request) {
       ticketId: submissions.ticketId,
       serviceType: submissions.serviceType,
       title: submissions.title,
+      scope: submissions.scope,
+      urgency: submissions.urgency,
       briefDetails: submissions.briefDetails,
+      fileUrls: submissions.fileUrls,
       status: submissions.status,
       paidAt: submissions.paidAt,
       createdAt: submissions.createdAt,
       revisionCount: submissions.revisionCount,
       clientSignoffAt: submissions.clientSignoffAt,
       commissionStatus: submissions.commissionStatus,
+      // No client contact fields are read in this public response.
+      handoffNote: submissions.handoffNote,
+      handoffAt: submissions.handoffAt,
+      qaSignedOffAt: submissions.qaSignedOffAt,
     })
     .from(submissions)
     .where(sql`replace(upper(${submissions.ticketId}), '-', '') = ${normTicket(ticketId)}`)
@@ -33,6 +45,8 @@ export async function GET(request: Request) {
 
   const status = row.paidAt ? 'Paid and completed' : row.status || 'Pending Quote'
   const revisionCount = Math.min(MAX_REVISIONS, Math.max(0, Number(row.revisionCount ?? 0)))
+  const handoffNote = typeof row.handoffNote === 'string' ? row.handoffNote.trim().slice(0, 2000) || null : null
+
   return NextResponse.json({
     found: true,
     ticketId: row.ticketId,
@@ -43,7 +57,16 @@ export async function GET(request: Request) {
     revisionCount,
     maxRevisions: MAX_REVISIONS,
     delivered: Boolean(row.paidAt) || /delivered|complete|paid/i.test(row.status || ''),
-    clientSignoffAt: row.clientSignoffAt ?? null,
+    clientSignoffAt: asIso(row.clientSignoffAt),
     commissionStatus: row.commissionStatus === 'AVAILABLE' ? 'AVAILABLE' : 'PENDING',
+    scope: row.scope ?? null,
+    urgency: row.urgency ?? null,
+    scopeSummary: scopeSummaryFor(row),
+    fileUrls: row.fileUrls ?? null,
+    fileLinks: parseFileLinks(row.fileUrls),
+    completionWindow: completionWindow(row.urgency),
+    handoffNote,
+    handoffAt: asIso(row.handoffAt),
+    qaSignedOffAt: asIso(row.qaSignedOffAt),
   })
 }

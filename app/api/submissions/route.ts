@@ -5,10 +5,14 @@ import { db } from '@/lib/db'
 import { settings, submissions, users } from '@/lib/db/schema'
 import { ADMIN_ROLES, CHAT_ROLES, getStaffUser, isAdmin, isLead } from '@/lib/auth'
 import { briefTitle, fieldLabel } from '@/lib/fields'
-import { netMargin, subAgentOverride } from '@/lib/commission'
+import { OVERRIDE_RATE, netMargin, roundGhs, subAgentOverride } from '@/lib/commission'
+import { missingQaChecks, parseQaChecklist } from '@/components/admin/qa-checklist-keys'
 import { sendPush } from '@/lib/push'
 
 export const runtime = 'nodejs'
+
+const HOUR = 3_600_000
+const DAY = 24 * HOUR
 
 function clean(value: unknown, maxLength: number) {
   return typeof value === 'string' ? value.trim().slice(0, maxLength) : ''
@@ -18,6 +22,67 @@ const referrer = alias(users, 'referrer')
 const assignee = alias(users, 'assignee')
 
 const isDelivered = (status: string | null) => /delivered|complete|paid/i.test(status || '')
+
+// A job cannot move into a delivered/completed/paid state before the four
+// quality-assurance checks are ticked and signed off.
+function deliveryErrors(checklist: unknown, signedOffAt: unknown) {
+  const missing = missingQaChecks(checklist)
+  if (!signedOffAt) missing.push('Quality assurance sign-off')
+  return missing
+}
+
+function deliveryErrorMessage(missing: string[]) {
+  return `Complete the quality-assurance checklist before delivery: ${missing.join(', ')}.`
+}
+
+// Plain-language stale flag. No server polling: this is computed once per GET
+// from createdAt / assignedAt / status / paidAt. assignedAt is the only stored
+// specialist-update timestamp, so it acts as the last specialist update.
+function staleNote(row: {
+  createdAt: Date | null
+  assignedAt: Date | null
+  status: string | null
+  paidAt: Date | null
+}): string | null {
+  if (row.paidAt || isDelivered(row.status)) return null
+  const created = row.createdAt ? new Date(row.createdAt).getTime() : NaN
+  if (!Number.isFinite(created)) return null
+  const now = Date.now()
+  const waitingForQuote = !row.assignedAt && /pending quote|quot|await/i.test(row.status || '')
+  if (waitingForQuote && now - created > 2 * DAY) return 'Waiting over 2 days for quote approval'
+  if (row.assignedAt) {
+    const assigned = new Date(row.assignedAt).getTime()
+    if (Number.isFinite(assigned) && now - assigned > DAY) return 'Waiting over 1 day since the last specialist update'
+  }
+  return null
+}
+
+// Quote guardrail: after the specialist fee, direct agent cuts and the
+// sub-agent override are paid, at least 15 percent of the quote must remain.
+function marginCheck(quote: number, specialistFee: number, directAgentCut: number) {
+  const net = netMargin(quote, specialistFee, directAgentCut)
+  const override = subAgentOverride(net)
+  const platformMargin = roundGhs(net - override)
+  const required = roundGhs(quote * OVERRIDE_RATE)
+  const figures = `quote GHS ${quote.toFixed(2)}, specialist fee GHS ${specialistFee.toFixed(2)}, direct agent cut GHS ${directAgentCut.toFixed(2)}, sub-agent override GHS ${override.toFixed(2)}`
+  return {
+    net,
+    override,
+    platformMargin,
+    required,
+    ok: platformMargin > 0 && platformMargin >= required,
+    error: `Quote guardrail: ${figures} leaves GHS ${platformMargin.toFixed(2)} of platform margin, below the required GHS ${required.toFixed(2)} (${Math.round(OVERRIDE_RATE * 100)} percent of the quote).`,
+  }
+}
+
+// Returns null when the field was not supplied, a non-negative amount when it
+// was, and NaN when it is invalid.
+function suppliedAmount(value: unknown) {
+  if (value === undefined) return null
+  if (value === null || value === '') return 0
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 && n <= 1_000_000 ? n : NaN
+}
 
 // A valid chain is exactly two levels: referrer -> upline, with no parent above
 // the upline. Never infer an override from an unlinked or over-deep account.
@@ -38,7 +103,7 @@ async function resolveUpline(referredBy: number | null) {
 }
 
 // The specialist's pay and the referring agent's commission are subtracted
-// BEFORE the 15% override, so the override can only ever come from platform margin.
+// BEFORE the override, so the override can only ever come from platform margin.
 async function overrideFor(row: {
   referredBy: number | null
   assignedTo: number | null
@@ -85,6 +150,15 @@ export async function GET() {
         clientSignoffAt: submissions.clientSignoffAt,
         commissionStatus: submissions.commissionStatus,
         overrideGhs: submissions.overrideGhs,
+        assignedAt: submissions.assignedAt,
+        handoffNote: submissions.handoffNote,
+        handoffAt: submissions.handoffAt,
+        qaChecklist: submissions.qaChecklist,
+        qaSignedOffAt: submissions.qaSignedOffAt,
+        specialistFeeGhs: submissions.specialistFeeGhs,
+        quoteNetMarginGhs: submissions.quoteNetMarginGhs,
+        payoutReference: submissions.payoutReference,
+        settlementDate: submissions.settlementDate,
         createdAt: submissions.createdAt,
       })
       .from(submissions)
@@ -92,7 +166,7 @@ export async function GET() {
       .leftJoin(assignee, eq(submissions.assignedTo, assignee.id))
       .orderBy(desc(submissions.createdAt))
       .limit(100)
-    return NextResponse.json(rows)
+    return NextResponse.json(rows.map((row) => ({ ...row, staleFlag: staleNote(row) })))
   } catch (error) {
     console.error('Submissions fetch failed:', error)
     return NextResponse.json({ error: 'Could not load submissions.' }, { status: 500 })
@@ -134,7 +208,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Track-based ticket number from the database, e.g. AC-2610-007 (matches TICKET_RE / tracker)
+    // Track-based ticket number from the database, for example AC-2610-007 (matches TICKET_RE / tracker)
     const { rows: [num] } = await db.execute(sql`select public.next_ticket_id(${category}) as id`)
     const ticketId = String((num as { id: string }).id)
     const [created] = await db
@@ -183,6 +257,8 @@ export async function POST(request: Request) {
 
 // Admins:
 //  { action: 'assign', id, assignedTo, priceGhs }  -> give the job to an agent with its price (required)
+//  { action: 'qualityAssurance', id, qaChecklist, signOff, handoffNote } -> save checklist progress only
+//  { action: 'deliver', id }                        -> mark Delivered after the quality-assurance gate passes
 //  { action: 'paid', id }                           -> client paid; commissions become earned
 // Commission = price x the % in Settings, for the assigned agent and (separately) the referrer.
 export async function PATCH(request: Request) {
@@ -211,12 +287,18 @@ export async function PATCH(request: Request) {
       const f = body.fields || {}
       const set: Partial<typeof submissions.$inferInsert> = {}
       const text = (k: string, n: number) => (typeof f[k] === 'string' ? f[k].trim().slice(0, n) : undefined)
+      const nextStatus = text('status', 30)
+      if (nextStatus && !isDelivered(existing.status) && isDelivered(nextStatus)) {
+        const missing = deliveryErrors(existing.qaChecklist, existing.qaSignedOffAt)
+        if (missing.length) return NextResponse.json({ error: deliveryErrorMessage(missing) }, { status: 400 })
+      }
       if (text('title', 120) !== undefined) set.title = text('title', 120) || null
       if (text('briefDetails', 4000) !== undefined) set.briefDetails = text('briefDetails', 4000)
       if (text('clientContact', 50) !== undefined) set.clientContact = text('clientContact', 50)
       if (text('scope', 50) !== undefined) set.scope = text('scope', 50)
       if (text('urgency', 50) !== undefined) set.urgency = text('urgency', 50)
-      if (text('status', 30)) set.status = text('status', 30)
+      if (nextStatus) set.status = nextStatus
+      if (text('handoffNote', 2000) !== undefined) set.handoffNote = text('handoffNote', 2000) || null
       if (f.priceGhs !== undefined) {
         const price = Number(f.priceGhs)
         if (f.priceGhs === '' || f.priceGhs === null) set.priceGhs = null
@@ -229,6 +311,25 @@ export async function PATCH(request: Request) {
           if (existing.referredBy && existing.referredBy !== existing.assignedTo) set.referralCommissionGhs = c.toFixed(2)
           else if (existing.referredBy) set.referralCommissionGhs = null
         } else return NextResponse.json({ error: 'Invalid price.' }, { status: 400 })
+      }
+      const specialistFee = suppliedAmount(f.specialistFeeGhs)
+      if (f.specialistFeeGhs !== undefined) {
+        if (Number.isNaN(specialistFee!)) return NextResponse.json({ error: 'Invalid specialist fee.' }, { status: 400 })
+        set.specialistFeeGhs = (specialistFee || 0).toFixed(2)
+      }
+      const quoteMargin = suppliedAmount(f.quoteNetMarginGhs)
+      if (f.quoteNetMarginGhs !== undefined) {
+        if (Number.isNaN(quoteMargin!)) return NextResponse.json({ error: 'Invalid quote net margin.' }, { status: 400 })
+        set.quoteNetMarginGhs = (quoteMargin || 0).toFixed(2)
+      }
+      // Guardrail runs for a new quote or a newly supplied specialist fee.
+      const guardQuote = Number(set.priceGhs ?? existing.priceGhs ?? 0)
+      if (guardQuote > 0 && (f.priceGhs !== undefined || f.specialistFeeGhs !== undefined)) {
+        const fee = f.specialistFeeGhs !== undefined ? specialistFee! : Number(existing.specialistFeeGhs || 0)
+        const direct = Number((set.commissionGhs ?? existing.commissionGhs) || 0)
+          + Number((set.referralCommissionGhs ?? existing.referralCommissionGhs) || 0)
+        const check = marginCheck(guardQuote, fee, direct)
+        if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 })
       }
       if (f.unpay === true) {
         set.paidAt = null
@@ -254,7 +355,42 @@ export async function PATCH(request: Request) {
       return NextResponse.json(updated)
     }
 
-    // Client-visible revision counter: max 2, guarded in SQL against races.
+    // Save checklist progress (and an optional handoff note) without touching status.
+    if (body?.action === 'qualityAssurance') {
+      if (body.qaChecklist !== undefined && (typeof body.qaChecklist !== 'object' || body.qaChecklist === null || Array.isArray(body.qaChecklist))) {
+        return NextResponse.json({ error: 'Invalid quality-assurance checklist.' }, { status: 400 })
+      }
+      const checklist = parseQaChecklist(body.qaChecklist ?? existing.qaChecklist)
+      const missing = missingQaChecks(checklist)
+      const set: Partial<typeof submissions.$inferInsert> = { qaChecklist: checklist }
+      if (body.handoffNote !== undefined) {
+        set.handoffNote = clean(body.handoffNote, 2000) || null
+        if (set.handoffNote && !existing.handoffAt) set.handoffAt = new Date()
+      }
+      if (body.signOff === true) {
+        if (missing.length) {
+          return NextResponse.json({ error: `Cannot sign off quality assurance yet: ${missing.join(', ')} still outstanding.` }, { status: 400 })
+        }
+        set.qaSignedOffAt = existing.qaSignedOffAt ?? new Date()
+      } else if (missing.length) {
+        // Editing a completed checklist back to incomplete revokes the sign-off.
+        set.qaSignedOffAt = null
+      }
+      const [updated] = await db.update(submissions).set(set).where(eq(submissions.id, id)).returning()
+      return NextResponse.json(updated)
+    }
+
+    // Explicit delivery action used by the admin dashboard.
+    if (body?.action === 'deliver') {
+      if (isDelivered(existing.status) || existing.paidAt) return NextResponse.json(existing)
+      if (!existing.assignedTo) return NextResponse.json({ error: 'Assign the job before marking it delivered.' }, { status: 400 })
+      const missing = deliveryErrors(existing.qaChecklist, existing.qaSignedOffAt)
+      if (missing.length) return NextResponse.json({ error: deliveryErrorMessage(missing) }, { status: 400 })
+      const [updated] = await db.update(submissions).set({ status: 'Delivered' }).where(eq(submissions.id, id)).returning()
+      return NextResponse.json(updated)
+    }
+
+    // Client-visible revision counter: maximum of two, guarded in SQL against races.
     if (body?.action === 'revision') {
       if (existing.clientSignoffAt) return NextResponse.json({ error: 'The client has already signed off.' }, { status: 409 })
       if (existing.revisionCount >= 2) return NextResponse.json({ error: 'The two-revision limit has been reached.' }, { status: 409 })
@@ -307,6 +443,15 @@ export async function PATCH(request: Request) {
       const [config] = await db.select({ pct: settings.commissionPercent }).from(settings).where(eq(settings.id, 1)).limit(1)
       const pct = Number(config?.pct ?? 10)
       const commission = Math.round(price * pct) / 100
+      // Referral commission only when a DIFFERENT agent referred the client via their link.
+      // An agent assigned to their own referral never double-dips.
+      const referral = existing.referredBy && existing.referredBy !== agent.id ? commission : 0
+      const specialistFee = suppliedAmount(body?.specialistFeeGhs)
+      const quoteMargin = suppliedAmount(body?.quoteNetMarginGhs)
+      if (Number.isNaN(specialistFee!)) return NextResponse.json({ error: 'Invalid specialist fee.' }, { status: 400 })
+      if (Number.isNaN(quoteMargin!)) return NextResponse.json({ error: 'Invalid quote net margin.' }, { status: 400 })
+      const check = marginCheck(price, specialistFee || 0, commission + referral)
+      if (!check.ok) return NextResponse.json({ error: check.error }, { status: 400 })
 
       const [updated] = await db
         .update(submissions)
@@ -316,9 +461,9 @@ export async function PATCH(request: Request) {
           status: 'Assigned',
           priceGhs: price.toFixed(2),
           commissionGhs: commission.toFixed(2),
-          // Referral commission only when a DIFFERENT agent referred the client via their link.
-          // An agent assigned to their own referral never double-dips.
-          referralCommissionGhs: existing.referredBy && existing.referredBy !== agent.id ? commission.toFixed(2) : null,
+          referralCommissionGhs: referral ? referral.toFixed(2) : null,
+          specialistFeeGhs: body?.specialistFeeGhs === undefined ? undefined : (specialistFee || 0).toFixed(2),
+          quoteNetMarginGhs: body?.quoteNetMarginGhs === undefined ? undefined : (quoteMargin || 0).toFixed(2),
         })
         .where(eq(submissions.id, id))
         .returning()
@@ -337,6 +482,12 @@ export async function PATCH(request: Request) {
       }
       if (!existing.assignedTo || !existing.priceGhs) {
         return NextResponse.json({ error: 'Assign the job to an agent with a price first.' }, { status: 400 })
+      }
+      // Paid is a delivered state for the client, so the quality-assurance gate applies when
+      // a job skips the explicit Delivered action.
+      if (!isDelivered(existing.status)) {
+        const missing = deliveryErrors(existing.qaChecklist, existing.qaSignedOffAt)
+        if (missing.length) return NextResponse.json({ error: deliveryErrorMessage(missing) }, { status: 400 })
       }
       // Marking paid only clears the ledger for release; client sign-off makes
       // commission + any margin-funded override AVAILABLE for the MoMo batch.

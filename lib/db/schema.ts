@@ -102,6 +102,16 @@ export const submissions = pgTable('submissions', {
   overrideGhs: numeric('override_ghs', { precision: 10, scale: 2 }),
   assignedAt: timestamp('assigned_at'),
   paidAt: timestamp('paid_at'),
+  // Specialist handoff + pre-delivery quality assurance (all nullable).
+  handoffNote: text('handoff_note'),
+  handoffAt: timestamp('handoff_at'),
+  qaChecklist: jsonb('qa_checklist'),
+  qaSignedOffAt: timestamp('qa_signed_off_at'),
+  specialistFeeGhs: numeric('specialist_fee_ghs', { precision: 10, scale: 2 }),
+  quoteNetMarginGhs: numeric('quote_net_margin_ghs', { precision: 10, scale: 2 }),
+  // Written by the admin payout-batch API when a MoMo batch is exported.
+  payoutReference: varchar('payout_reference', { length: 120 }),
+  settlementDate: timestamp('settlement_date'),
   createdAt: timestamp('created_at').defaultNow(),
 })
 

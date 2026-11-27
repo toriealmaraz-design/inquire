@@ -9,6 +9,10 @@ export type Payout = {
   date: string | null
   amountGhs: number
   status: string
+  kind?: 'referral' | 'override'
+  subAgent?: string | null
+  payoutReference: string | null
+  settlementDate: string | null
 }
 
 const glass = 'border border-white/15 bg-white/[0.075] shadow-2xl shadow-black/20 backdrop-blur-2xl'
@@ -25,12 +29,15 @@ async function downloadReceipt(payout: Payout, agentName: string) {
     'GEMINI NEXUS — PAYOUT RECEIPT',
     '--------------------------------',
     `Agent: ${agentName || 'Gemini Nexus agent'}`,
-    `Payout reference: ${payout.ticketId}`,
-    `Date: ${formatPayoutDate(payout.date)}`,
+    `Payout reference: ${payout.payoutReference || payout.ticketId}`,
+    `Job ticket identifier: ${payout.ticketId}`,
+    `Paid date: ${formatPayoutDate(payout.date)}`,
+    `Settlement date: ${formatPayoutDate(payout.settlementDate)}`,
     `Commission: GHS ${payout.amountGhs.toFixed(2)}`,
     `Status: ${payout.status}`,
+    `Payout type: ${payout.kind === 'override' ? 'Two-tier upline override' : 'Direct referral commission'}`,
     '',
-    'Payout reference is the job ticket ID; no separate MoMo reference is recorded.',
+    'An administrator records the MoMo transaction reference and settlement date. Until one is recorded, the job ticket identifier is the payout reference.',
   ].join('\n')
   try {
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
@@ -50,12 +57,12 @@ async function downloadReceipt(payout: Payout, agentName: string) {
   }
 }
 
-/** Paid referral commissions from /api/agent/payouts with a per-row receipt. */
+/** Paid referrals and overrides from /api/agent/payouts with a per-row receipt. */
 export function PayoutHistory({ payouts, totalPaidGhs, agentName }: { payouts: Payout[] | null; totalPaidGhs: number; agentName: string }) {
   return (
     <div className={`${glass} mt-6 rounded-3xl p-5 sm:p-6`}>
-      <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><ReceiptText className="size-4 text-cyan-300" /> Payout history &amp; receipts</AnimatedHeading>
-      <p className="mt-1 text-xs text-slate-500">Cleared referral commissions. The job ticket ID is the payout reference; no MoMo ID is stored.</p>
+      <AnimatedHeading as="h2" className="flex items-center gap-2 font-bold"><ReceiptText className="size-4 text-cyan-300" /> Payout history and receipts</AnimatedHeading>
+      <p className="mt-1 text-xs text-slate-500">Cleared commissions and margin-funded overrides. A recorded MoMo transaction reference and settlement date appear on each row.</p>
 
       {payouts === null ? (
         <p className="mt-4 text-sm text-slate-500">Loading…</p>
@@ -63,13 +70,15 @@ export function PayoutHistory({ payouts, totalPaidGhs, agentName }: { payouts: P
         <p className="mt-4 text-sm text-slate-500">No cleared referrals yet. Paid jobs you referred will appear here.</p>
       ) : (
         <>
-          <p className="mt-4 text-xs text-slate-400">Cleared total <strong className="text-emerald-300">GHS {totalPaidGhs.toFixed(2)}</strong> across {payouts.length} paid referrals</p>
+          <p className="mt-4 text-xs text-slate-400">Cleared total <strong className="text-emerald-300">GHS {totalPaidGhs.toFixed(2)}</strong> across {payouts.length} payouts</p>
           <div className="mt-3 overflow-x-auto rounded-2xl border border-white/10">
-            <table className="w-full min-w-[540px] text-left text-xs">
+            <table className="w-full min-w-[760px] text-left text-xs">
               <thead className="bg-white/5 text-[10px] uppercase tracking-wider text-slate-500">
                 <tr>
                   <th className="px-4 py-3 font-medium">Payout reference</th>
-                  <th className="px-4 py-3 font-medium">Date</th>
+                  <th className="px-4 py-3 font-medium">Job ticket identifier</th>
+                  <th className="px-4 py-3 font-medium">Paid date</th>
+                  <th className="px-4 py-3 font-medium">Settlement date</th>
                   <th className="px-4 py-3 font-medium">Commission</th>
                   <th className="px-4 py-3 font-medium">Status</th>
                   <th className="px-4 py-3 font-medium"><span className="sr-only">Receipt</span></th>
@@ -77,9 +86,11 @@ export function PayoutHistory({ payouts, totalPaidGhs, agentName }: { payouts: P
               </thead>
               <tbody className="divide-y divide-white/10">
                 {payouts.map((payout) => (
-                  <tr key={payout.id} className="hover:bg-white/[0.04]">
-                    <td className="px-4 py-3 font-mono text-cyan-200">{payout.ticketId}</td>
+                  <tr key={`${payout.id}-${payout.kind || 'referral'}`} className="hover:bg-white/[0.04]">
+                    <td className="px-4 py-3 font-mono text-cyan-200">{payout.payoutReference || payout.ticketId}</td>
+                    <td className="px-4 py-3 font-mono text-slate-400">{payout.ticketId}</td>
                     <td className="px-4 py-3 text-slate-400">{formatPayoutDate(payout.date)}</td>
+                    <td className="px-4 py-3 text-slate-400">{formatPayoutDate(payout.settlementDate)}</td>
                     <td className="px-4 py-3 font-semibold text-white">GHS {payout.amountGhs.toFixed(2)}</td>
                     <td className="px-4 py-3"><span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] text-emerald-300">{payout.status}</span></td>
                     <td className="px-4 py-3 text-right">
@@ -97,6 +108,7 @@ export function PayoutHistory({ payouts, totalPaidGhs, agentName }: { payouts: P
               </tbody>
             </table>
           </div>
+          <p className="mt-3 text-[11px] leading-5 text-slate-500">When no administrator-recorded reference exists, the job ticket identifier doubles as the payout reference. Override payouts are funded from Gemini Nexus margin, never from specialist pay or the direct agent&apos;s cut.</p>
         </>
       )}
     </div>

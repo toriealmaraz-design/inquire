@@ -13,7 +13,7 @@
 - `app/api/cron/cleanup/route.ts` plus `vercel.json` remove stale files on a schedule instead of running a compute-heavy worker.
 - Ticket and admin queries use `LIMIT` and indexed columns (`ticket_id`, `id`, timestamps).
 - The deadline badge ticks client-side only; it does not query Postgres on an interval.
-- Feature 19 is implemented: `/api/storage/upload` issues 900s presigned R2 PUT tickets, `/api/storage/file?key=...` redirects to a fresh 900s signed GET, and all browser uploads use one helper with a Supabase fallback. `site-assets` (logo/favicon) is never expired by cleanup.
+- Feature 19 is implemented: `/api/storage/upload` issues presigned R2 PUT tickets valid for 900 seconds, `/api/storage/file?key=...` redirects to a freshly signed GET valid for 900 seconds, and all browser uploads use one helper with a Supabase fallback. `site-assets` (logo and favicon) is never expired by cleanup.
 
 ## Pending
 
@@ -30,7 +30,7 @@ No values are stored in the repository. All variables are server-side; none use 
 | `R2_ACCOUNT_ID` | R2 mode | Cloudflare account ID used to build the S3 endpoint |
 | `R2_ACCESS_KEY_ID` | R2 mode | R2 API token access key ID |
 | `R2_SECRET_ACCESS_KEY` | R2 mode | R2 API token secret |
-| `R2_BUCKET` | R2 mode | Private bucket name (e.g. `nexus-files`) |
+| `R2_BUCKET` | R2 mode | Private bucket name (for example `nexus-files`) |
 | `CRON_SECRET` | cleanup | Bearer token expected by `/api/cron/cleanup` when set |
 
 R2 mode turns on only when **all four** `R2_*` variables are present. With any of them missing, `/api/storage/upload` returns a Supabase ticket and the app behaves exactly as before, so local development needs no Cloudflare setup.
@@ -39,7 +39,7 @@ R2 mode turns on only when **all four** `R2_*` variables are present. With any o
 
 - Create a private R2 bucket and an API token scoped to **Object Read & Write** for that bucket; add the four `R2_*` variables above in Vercel (Production/Preview as needed) and redeploy.
 - Add a bucket CORS policy allowing the app origin(s) for `PUT` and `GET`, with `content-type` in `AllowedHeaders`. Presigned PUTs send `Content-Type` as a signed header, so the browser must be allowed to send it.
-- Use the S3 API endpoint `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`, region `auto`, path-style disabled. No public R2 domain or custom domain is needed: links are stored as `/api/storage/file?key=...` and redirect to a fresh 900s signed GET on every request.
+- Use the S3 API endpoint `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com`, region `auto`, path-style disabled. No public R2 domain or custom domain is needed: links are stored as `/api/storage/file?key=...` and redirect to a freshly signed GET valid for 900 seconds on every request.
 - `POST /api/storage/upload` validates name/MIME/size (15 MB max) and restricts `site-assets` tickets to signed-in staff; `uploads` stays public for client briefs.
 - `POST /api/storage/delete` is staff-only; admin deletion calls it with R2 keys parsed from `submissions.fileUrls`/`uploads.fileUrl`.
 - The weekly Vercel cron hits `/api/cron/cleanup` (`0 3 * * 0`). Retention comes from `settings.fileRetentionDays` (default 7). In R2 mode it scans at most 500 `uploads/` objects using paginated `ListObjectsV2`, deletes expired keys and removes matching DB rows; `site-assets/` and the Supabase path are unchanged.
